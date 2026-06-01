@@ -80,3 +80,40 @@ HTML sources (Wellfound/Naukri) are skipped until a real raw doc exists.
 
 **Consequences:** Re-runnable normalization; location/skills are best-effort;
 cross-source dedup on the carried MinHash is Day 7.
+
+## ADR-0006 — Custom Airflow image with an isolated app venv (first Dockerfile, Day 6)
+
+**Context:** DAG tasks run inside the Airflow containers, which on the stock image
+lack our deps/code/DB env. Installing our package directly into Airflow's env
+upgrades SQLAlchemy to 2.0 (our models use the 2.0 DeclarativeBase API), but
+Airflow 2.9 pins SQLAlchemy <2.0 and its ORM breaks under 2.0.
+
+**Decision:** `orchestration/airflow/Dockerfile` extends the stock image and builds
+a SEPARATE venv at `/opt/jobatlas-venv` (`pip install .` -> scrapy, pymongo,
+datasketch, psycopg, SQLAlchemy 2.0; no torch). Airflow's own env stays at 1.4. DAG
+files import only airflow/pendulum; all app work runs via
+`/opt/jobatlas-venv/bin/python -m ...` BashOperators (scrape, normalize,
+jobatlas.dedup, jobatlas.report). Live code is bind-mounted and wins via PYTHONPATH.
+Service-name DB URLs + Connections/Variables come from the Airflow env. First
+Dockerfile lands at Day 6 (vs Day 13); hadolint hook (deferred #3) comes due.
+
+**Consequences:** Image rebuild when app deps change (e.g. sentence-transformers for
+embeddings_refresh, which will run in the same venv). Playwright browsers omitted —
+JS spiders stay host/best-effort (ADR-0004).
+
+## ADR-0007 — Dedup recomputes MinHash over title+company+city, not the carried full-text signature
+
+**Context:** The scrape-time MinHash (`staging.jobs.minhash_signature`) spans
+title+company+location+description. Aggregators (e.g. Turing) post many DISTINCT
+roles with near-identical boilerplate descriptions, so full-text Jaccard exceeds 0.85
+across different roles — the first dedup run merged 33 distinct Turing postings into
+one "duplicate" group. False positive: distinct roles, not reposts.
+
+**Decision:** `jobatlas.dedup` recomputes the MinHash over title+company+city
+(role-identity), not the carried full-text signature. Same num_perm=128, 3-word
+shingles, Jaccard via Variable `dedup_jaccard`. The carried signature stays in the
+column for lineage.
+
+**Consequences:** Dedup groups true reposts (same role+company+city) and no longer
+collapses distinct roles sharing boilerplate. Cross-source dedup with differing title
+formatting may need a fuzzier key later; revisit when real cross-source overlap exists.

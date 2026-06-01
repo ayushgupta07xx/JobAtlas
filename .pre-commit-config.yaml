@@ -34,4 +34,9 @@ repos:
       - id: sqlfluff-fix
         files: \.sql$
 
+  - repo: https://github.com/hadolint/hadolint
+    rev: v2.12.0
+    hooks:
+      - id: hadolint-docker
+
 # hadolint added when Dockerfiles land in apps/ — see docs/decisions.md

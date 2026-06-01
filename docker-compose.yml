@@ -1,7 +1,10 @@
 name: jobatlas
 
 x-airflow-common: &airflow-common
-  image: apache/airflow:2.9.3-python3.11
+  build:
+    context: .
+    dockerfile: orchestration/airflow/Dockerfile
+  image: jobatlas/airflow:2.9.3
   environment: &airflow-common-env
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow_db
@@ -11,10 +14,25 @@ x-airflow-common: &airflow-common
     AIRFLOW__API__AUTH_BACKENDS: airflow.api.auth.backend.basic_auth
     AIRFLOW__SCHEDULER__MIN_FILE_PROCESS_INTERVAL: '30'
     _PIP_ADDITIONAL_REQUIREMENTS: ''
+    # JobAtlas: live code path + service-name DB conns (container env wins; .env override=False)
+    PYTHONPATH: /opt/jobatlas/src:/opt/jobatlas
+    DATABASE_URL: postgresql+psycopg://jobatlas:changeme-local-only@postgres:5432/jobatlas
+    MONGO_URI: mongodb://mongo:27017
+    MONGO_DB: jobatlas
+    # Airflow Connections + Variables (auto-loaded from env)
+    AIRFLOW_CONN_JOBATLAS_PG: postgres://jobatlas:changeme-local-only@postgres:5432/jobatlas
+    AIRFLOW_CONN_JOBATLAS_MONGO: mongo://mongo:27017/jobatlas
+    AIRFLOW_VAR_JOBATLAS_SOURCES: '["adzuna", "jobicy"]'
+    AIRFLOW_VAR_DEDUP_JACCARD: '0.85'
+    AIRFLOW_VAR_EMBED_BATCH_SIZE: '32'
   volumes:
     - ./orchestration/airflow/dags:/opt/airflow/dags
     - ./orchestration/airflow/plugins:/opt/airflow/plugins
     - airflow_logs:/opt/airflow/logs
+    - ./src:/opt/jobatlas/src
+    - ./apps:/opt/jobatlas/apps
+    - ./scrapers:/opt/jobatlas/scrapers
+    - ./.env:/opt/jobatlas/.env:ro
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:
     postgres:
@@ -71,10 +89,10 @@ services:
       - --smp=1
       - --default-log-level=warn
     ports:
-      - "18081:18081"   # schema registry
-      - "18082:18082"   # rest proxy
-      - "19092:19092"   # kafka api (external)
-      - "19644:9644"    # admin api
+      - "18081:18081"
+      - "18082:18082"
+      - "19092:19092"
+      - "19644:9644"
     volumes:
       - redpanda_data:/var/lib/redpanda/data
     healthcheck:
@@ -92,8 +110,8 @@ services:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
     ports:
-      - "9000:9000"   # S3 API
-      - "9001:9001"   # console UI
+      - "9000:9000"
+      - "9001:9001"
     volumes:
       - minio_data:/data
     healthcheck:
@@ -150,7 +168,7 @@ services:
     container_name: jobatlas-airflow-webserver
     command: webserver
     ports:
-      - "8080:8080"
+      - "8088:8080"
     depends_on:
       airflow-init:
         condition: service_completed_successfully
