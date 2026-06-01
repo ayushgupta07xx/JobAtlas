@@ -39,3 +39,27 @@ file in `spiders/`. §9's per-source directory sketch is superseded for scrapers
 (documented here; no other code change). Raw payloads still land per §8: API
 JSON -> Mongo `raw_api_responses`, HTML -> Mongo `raw_html`, plus the CDC-able
 copy in `raw.jobs_raw`.
+
+## ADR-0004 — Source reliability: APIs for volume, JS scrapes best-effort
+
+**Status:** Accepted
+
+**Context:** Wellfound (and likely Naukri) deploy managed bot protection
+(Cloudflare/DataDome-style). Our scrapy-playwright spider with a real Chrome
+fingerprint renders the listing and lands jobs whenever a request returns 200
+(verified: 585 KB / 42 jobs in recon), but after a burst of automated hits the
+IP is reputation-flagged and returns 403 for an indeterminate cooldown. §19
+anticipated exactly this.
+
+**Decision:** Treat JS-scraped sources (Wellfound, and later Naukri/Hirist/
+Instahyre) as best-effort/opportunistic. Do NOT escalate evasion — residential
+proxies, stealth plugins, JS-challenge/CAPTCHA solving — which crosses the
+LEGAL.md + §21 rule 6 politeness/ToS line and is over-engineering. Guaranteed
+volume comes from official APIs (Adzuna ~3k/refresh, Jobicy supplementary).
+Retain the Wellfound spider; run it spaced out / via the daily scrape; accept
+intermittent yield.
+
+**Consequences:** The volume floor rests on API sources (defensible per §19's
+fallback). The Scrapy + Playwright keyword stays fully earned — the spider is
+built, renders, and lands when unblocked. No new dependencies (no proxy/stealth
+stack). Wellfound to be re-validated on a clean session in a few days.
