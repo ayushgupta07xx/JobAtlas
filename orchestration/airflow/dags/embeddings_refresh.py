@@ -7,7 +7,6 @@ model baked into the image). Batch size from the Airflow Variable `embed_batch_s
 from __future__ import annotations
 
 import pendulum
-
 from airflow.models.dag import DAG
 from airflow.operators.bash import BashOperator
 

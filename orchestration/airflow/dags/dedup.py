@@ -7,7 +7,6 @@ Airflow Variable `dedup_jaccard` (default 0.85), templated into the command.
 from __future__ import annotations
 
 import pendulum
-
 from airflow.models.dag import DAG
 from airflow.operators.bash import BashOperator
 
