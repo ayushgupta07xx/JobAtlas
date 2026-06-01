@@ -63,3 +63,20 @@ intermittent yield.
 fallback). The Scrapy + Playwright keyword stays fully earned — the spider is
 built, renders, and lands when unblocked. No new dependencies (no proxy/stealth
 stack). Wellfound to be re-validated on a clean session in a few days.
+
+## ADR-0005 — Normalizer reads bulk fields from Postgres, Mongo only for MinHash
+
+**Context:** `raw.jobs_raw.payload` (JSONB) mirrors the Mongo payload, but the
+128-perm MinHash signature lives only in the Mongo raw doc.
+
+**Decision:** The Day-5 normalizer (`apps/normalizer/`) iterates `raw.jobs_raw`
+(gives `raw_id` lineage + payload), batch-fetches `minhash_signature` from Mongo
+by `mongo_object_id`, parses per-source (`adzuna`, `jobicy`), and UPSERTs into
+`staging.jobs` on `(source, source_url)` — idempotent across re-runs, with
+in-batch dedup (last id wins) to avoid ON CONFLICT double-affect. Adzuna India →
+INR/IN; Jobicy currency from `salaryCurrency`, country from `jobGeo`→ISO-3166
+(unknown/worldwide → `ZZ`). Skills via deterministic keyword match (best-effort).
+HTML sources (Wellfound/Naukri) are skipped until a real raw doc exists.
+
+**Consequences:** Re-runnable normalization; location/skills are best-effort;
+cross-source dedup on the carried MinHash is Day 7.
