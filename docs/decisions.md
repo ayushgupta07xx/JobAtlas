@@ -18,3 +18,24 @@ Chronological record of architectural decisions for JobAtlas. Each entry is shor
 **Decision:** Alembic owns `raw.jobs_raw`, `staging.jobs`, `staging.jobs_embeddings` and creates the empty `marts` schema. dbt (dbt-postgres locally; BigQuery/Snowflake later) owns all tables inside `marts.*`. First migration is hand-authored for reliable pgvector/HNSW DDL.
 **Consequence:** Star-schema keywords earned by dbt (Day 8–9), unchanged. Reversible if we later want Alembic-managed marts.
 **Note:** Alembic lives at repo root (`alembic/` + `alembic.ini`), the standard convention, rather than §9's `warehouse/sql/migrations/` placeholder.
+
+## ADR-0003 — Single Scrapy project for all sources
+
+**Status:** Accepted
+
+**Context:** §9 sketches per-source scraper directories (`scrapers/adzuna_api/`,
+`scrapers/wellfound/`, ...). Scrapy is designed around a single project: one
+settings module, shared `items.py` / `pipelines.py` / `middlewares.py`, and a
+`spiders/` package with one spider per source. Sibling project dirs would
+duplicate settings and the MinHash/Mongo/Postgres pipeline per source.
+
+**Decision:** One Scrapy project at `scrapers/` (package `jobatlas_scrapers/`),
+one spider module per source under `spiders/` (adzuna, wellfound, naukri, ...).
+Shared item schema, pipelines, middlewares, settings live once at the package
+root. Mirrors ADR-0002's "standard tool convention over placeholder path".
+
+**Consequences:** `scrapy` commands run from `scrapers/`; adding a source is one
+file in `spiders/`. §9's per-source directory sketch is superseded for scrapers
+(documented here; no other code change). Raw payloads still land per §8: API
+JSON -> Mongo `raw_api_responses`, HTML -> Mongo `raw_html`, plus the CDC-able
+copy in `raw.jobs_raw`.
