@@ -30,6 +30,10 @@ class RotateUserAgentMiddleware:
         return mw
 
     def process_request(self, request, spider):
+        # Playwright requests get their UA from the browser context (settings);
+        # a header UA here would mismatch navigator.userAgent and look like a bot.
+        if request.meta.get("playwright"):
+            return None
         request.headers["User-Agent"] = random.choice(USER_AGENTS)
         return None
 

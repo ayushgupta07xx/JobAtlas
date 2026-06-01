@@ -35,7 +35,22 @@ DOWNLOAD_HANDLERS = {
     "https": "scrapy_playwright.handler.ScrapyPlaywrightDownloadHandler",
 }
 PLAYWRIGHT_BROWSER_TYPE = "chromium"
-PLAYWRIGHT_LAUNCH_OPTIONS = {"headless": True}
+PLAYWRIGHT_LAUNCH_OPTIONS = {
+    "headless": True,
+    "args": ["--disable-blink-features=AutomationControlled"],
+}
+# Real Chrome fingerprint so JS-heavy sites do not 403 the headless
+# context (UA + viewport + locale drive navigator.*).
+PLAYWRIGHT_CONTEXTS = {
+    "default": {
+        "user_agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+        ),
+        "viewport": {"width": 1366, "height": 768},
+        "locale": "en-US",
+    }
+}
 PLAYWRIGHT_DEFAULT_NAVIGATION_TIMEOUT = 30000  # ms
 
 # --- Item pipelines --------------------------------------------------------
