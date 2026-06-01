@@ -102,3 +102,9 @@ out/
 .terraform.lock.hcl
 *.tfvars
 !terraform.tfvars.example
+.venv-dbt/
+
+# dbt build artifacts
+warehouse/dbt_project/target/
+warehouse/dbt_project/dbt_packages/
+warehouse/dbt_project/logs/

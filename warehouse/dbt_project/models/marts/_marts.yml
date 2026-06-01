@@ -1,0 +1,87 @@
+version: 2
+models:
+  - name: dim_company
+    description: "Company dimension (distinct employers)."
+    columns:
+      - name: company_sk
+        description: "Surrogate key (hash of company_name)."
+        tests: [unique, not_null]
+      - name: company_name
+        tests: [not_null]
+  - name: dim_location
+    description: "Location dimension (city / state / country)."
+    columns:
+      - name: location_sk
+        tests: [unique, not_null]
+  - name: dim_skill
+    description: "Skill dimension (distinct tagged skills)."
+    columns:
+      - name: skill_sk
+        tests: [unique, not_null]
+      - name: skill_name
+        tests: [not_null]
+  - name: dim_date
+    description: "Date dimension (2023-01-01 to 2027-01-01)."
+    columns:
+      - name: date_key
+        description: "YYYYMMDD integer surrogate."
+        tests: [unique, not_null]
+  - name: dim_job
+    description: "SCD Type 2 job dimension (current + history); is_current marks the live version."
+    columns:
+      - name: job_version_sk
+        description: "Surrogate per job version (id + valid_from)."
+        tests: [unique, not_null]
+      - name: job_sk
+        tests:
+          - relationships:
+              arguments:
+                to: ref('fact_jobs')
+                field: job_sk
+  - name: fact_jobs
+    description: "Fact table: one row per active, non-duplicate job posting."
+    columns:
+      - name: job_sk
+        tests: [unique, not_null]
+      - name: job_id
+        tests: [unique, not_null]
+      - name: company_sk
+        tests:
+          - relationships:
+              arguments:
+                to: ref('dim_company')
+                field: company_sk
+      - name: location_sk
+        tests:
+          - relationships:
+              arguments:
+                to: ref('dim_location')
+                field: location_sk
+      - name: posted_date_key
+        tests:
+          - relationships:
+              arguments:
+                to: ref('dim_date')
+                field: date_key
+      - name: source
+        tests:
+          - accepted_values:
+              arguments:
+                values: ['adzuna', 'jobicy', 'wellfound', 'naukri', 'hirist', 'instahyre', 'indeed']
+              config:
+                severity: warn
+  - name: bridge_job_skill
+    description: "Resolves the job-to-skill many-to-many."
+    columns:
+      - name: job_sk
+        tests:
+          - relationships:
+              arguments:
+                to: ref('fact_jobs')
+                field: job_sk
+      - name: skill_sk
+        tests:
+          - relationships:
+              arguments:
+                to: ref('dim_skill')
+                field: skill_sk

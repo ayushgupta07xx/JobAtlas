@@ -1,0 +1,31 @@
+# Safe to commit: all secrets via env_var. Source .env before dbt commands.
+jobatlas:
+  target: postgres
+  outputs:
+    postgres:
+      type: postgres
+      host: "{{ env_var('POSTGRES_HOST', 'localhost') }}"
+      port: "{{ env_var('POSTGRES_PORT', '5432') | as_number }}"
+      user: "{{ env_var('POSTGRES_USER', 'jobatlas') }}"
+      password: "{{ env_var('POSTGRES_PASSWORD', 'jobatlas') }}"
+      dbname: "{{ env_var('POSTGRES_DB', 'jobatlas') }}"
+      schema: dbt_jobatlas
+      threads: 4
+      sslmode: disable
+    bigquery:  # ACTIVATED Day 8+ after GCP setup (deferred #1). Not exercised today.
+      type: bigquery
+      method: oauth
+      project: "{{ env_var('GCP_PROJECT_ID', 'jobatlas-496822') }}"
+      dataset: jobatlas_marts
+      location: US
+      threads: 4
+    snowflake:  # ACTIVATED Day 10 (30-day trial). Not exercised today.
+      type: snowflake
+      account: "{{ env_var('SNOWFLAKE_ACCOUNT', '') }}"
+      user: "{{ env_var('SNOWFLAKE_USER', '') }}"
+      password: "{{ env_var('SNOWFLAKE_PASSWORD', '') }}"
+      role: "{{ env_var('SNOWFLAKE_ROLE', 'TRANSFORM') }}"
+      database: "{{ env_var('SNOWFLAKE_DATABASE', 'JOBATLAS') }}"
+      warehouse: "{{ env_var('SNOWFLAKE_WAREHOUSE', 'JOBATLAS_WH') }}"
+      schema: marts
+      threads: 4

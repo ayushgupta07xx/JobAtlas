@@ -1,0 +1,10 @@
+version: 2
+sources:
+  - name: jobatlas
+    schema: staging
+    description: "Normalizer-populated landing zone (raw -> staging)."
+    tables:
+      - name: jobs
+        description: "Normalized postings; is_duplicate/dedup_group_id set by dedup DAG."
+      - name: jobs_embeddings
+        description: "384-dim BGE-small vectors (pgvector); API reads directly, passthrough in dbt."

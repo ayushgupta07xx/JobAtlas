@@ -117,3 +117,13 @@ column for lineage.
 **Consequences:** Dedup groups true reposts (same role+company+city) and no longer
 collapses distinct roles sharing boilerplate. Cross-source dedup with differing title
 formatting may need a fuzzier key later; revisit when real cross-source overlap exists.
+
+## ADR-0008 — dbt in an isolated venv with a multi-target profile
+**Context:** dbt's transitive pins (jinja2/agate/protobuf) conflict with the app `.venv` (torch-cpu, scrapy, sentence-transformers, SQLAlchemy 2.0); the project also needs Postgres + BigQuery + Snowflake targets.
+**Decision:** Dedicated `.venv-dbt` at repo root (gitignored), mirroring the Airflow isolated-venv precedent (ADR-0006). One committed `profiles.yml` (secrets via `env_var`) with postgres/bigquery/snowflake targets — only postgres exercised locally. Marts materialize into the existing `marts` schema (migration 0001); staging/intermediate into `dbt_staging`/`dbt_intermediate` via a `generate_schema_name` override. Layered staging → intermediate → marts; dbt_utils for surrogate keys and date spine.
+**Consequences:** dbt deps isolated from app code; profiles portable. BigQuery target waits on GCP setup (deferred), Snowflake on the Day-10 trial. dbt SQL is excluded from the repo sqlfluff hook via `.sqlfluffignore`.
+
+## ADR-0009 — dim_job as SCD Type 2 via dbt snapshot (check strategy)
+**Context:** Resume contract commits to SCD Type 2 on dim_job tracking title/salary/description changes.
+**Decision:** YAML-defined snapshot `dim_job_snapshot` (dbt 1.9+ form) over `int_jobs_active`, `check` strategy on [title, company, salary_min, salary_max, description], `unique_key=id`, schema `snapshots`. The `dim_job` mart reads the snapshot, exposing `job_version_sk` / stable `job_sk` / `dbt_valid_from` / `dbt_valid_to` / `is_current`; `fact_jobs` joins via `job_sk`.
+**Consequences:** Initial snapshot is the baseline (0 changes); versions accrue as `daily_scrape` re-runs mutate source rows, growing toward the ≥100-version target. Star covered by 28 tests.

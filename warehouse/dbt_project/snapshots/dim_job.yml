@@ -1,0 +1,8 @@
+snapshots:
+  - name: dim_job_snapshot
+    relation: ref('int_jobs_active')
+    config:
+      schema: snapshots
+      unique_key: id
+      strategy: check
+      check_cols: ['title', 'company', 'salary_min', 'salary_max', 'description']

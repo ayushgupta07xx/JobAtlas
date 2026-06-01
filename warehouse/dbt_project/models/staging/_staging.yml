@@ -1,0 +1,13 @@
+version: 2
+models:
+  - name: stg_jobs
+    description: "Cleaned, typed passthrough of staging.jobs (trim/nullif on text fields)."
+    columns:
+      - name: id
+        description: "Job natural key."
+        tests: [unique, not_null]
+      - name: source_url
+        description: "Canonical source URL."
+        tests: [not_null]
+  - name: stg_jobs_embeddings
+    description: "Passthrough of pgvector embeddings (384-dim); API reads directly."
