@@ -1,0 +1,19 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --paper: #f7f4ee;
+  --ink: #16130f;
+  --accent: #e8492b;
+}
+
+body {
+  font-family: var(--font-body), system-ui, sans-serif;
+  background-image: radial-gradient(
+    circle at 1px 1px,
+    rgba(22, 19, 15, 0.05) 1px,
+    transparent 0
+  );
+  background-size: 22px 22px;
+}
