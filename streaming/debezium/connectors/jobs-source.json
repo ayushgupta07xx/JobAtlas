@@ -1,0 +1,28 @@
+{
+  "name": "jobatlas-jobs-cdc",
+  "config": {
+    "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+    "tasks.max": "1",
+    "database.hostname": "postgres",
+    "database.port": "5432",
+    "database.user": "${POSTGRES_USER}",
+    "database.password": "${POSTGRES_PASSWORD}",
+    "database.dbname": "${POSTGRES_DB}",
+    "topic.prefix": "cdc",
+    "plugin.name": "pgoutput",
+    "slot.name": "jobatlas_cdc",
+    "publication.name": "jobatlas_cdc_pub",
+    "publication.autocreate.mode": "disabled",
+    "table.include.list": "staging.jobs",
+    "snapshot.mode": "initial",
+    "decimal.handling.mode": "double",
+    "key.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "key.converter.schemas.enable": "false",
+    "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "value.converter.schemas.enable": "false",
+    "transforms": "route",
+    "transforms.route.type": "org.apache.kafka.connect.transforms.RegexRouter",
+    "transforms.route.regex": "cdc.staging.jobs",
+    "transforms.route.replacement": "cdc.jobs"
+  }
+}

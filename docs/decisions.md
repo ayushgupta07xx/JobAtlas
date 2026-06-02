@@ -132,3 +132,23 @@ formatting may need a fuzzier key later; revisit when real cross-source overlap 
 **Context:** The product contract commits to dbt models materializing into both BigQuery and Snowflake. Source data lives in Postgres; the other warehouses have no live connection to it.
 **Decision:** `profiles.yml` carries postgres/snowflake/bigquery targets. Models are target-gated: Postgres reads the live `staging.jobs` source and unnests `skills` natively; non-Postgres targets read CSV seeds (`jobs_seed`, pre-unnested `job_skills_seed`) and use dialect-appropriate date functions (`dayofweek`/`dayname` vs `extract(dow)`/`to_char(...,'Day')`). `stg_jobs_embeddings` is disabled off-Postgres (pgvector-only). Fresh warehouses build with `dbt build` (DAG-ordered). Seeds are gitignored (scraped content; LEGAL no-redistribution) and regenerated via `\copy` (documented in `docs/multi-warehouse.md`).
 **Consequences:** Identical star schema + SCD2 build on Postgres and Snowflake (502/264 parity, 28 tests green on each). BigQuery target ready, pending GCP setup. Snowflake uses a dedicated `TRANSFORM` role + X-SMALL auto-suspend warehouse; it is a 30-day-trial demonstration, not the free-forever stack (Postgres/DuckDB).
+
+---
+
+## ADR-0011 — Change Data Capture via Debezium (Postgres -> Redpanda -> Snowflake)
+
+**Status:** Accepted (Day 11)
+
+**Context**
+The warehouse must reflect operational changes to `staging.jobs` without batch reloads or dual writes. Postgres is the system of record; Snowflake is the live analytical target during the trial.
+
+**Decision**
+- Enable Postgres logical replication (`wal_level=logical`) with publication `jobatlas_cdc_pub` over `staging.jobs` and `REPLICA IDENTITY FULL`.
+- Capture changes with the Debezium Postgres connector (`pgoutput`) on a Kafka Connect worker against the existing Redpanda broker.
+- Emit to a single topic `cdc.jobs` (RegexRouter rename), schema-less JSON, `decimal.handling.mode=double` so `numeric` salaries are usable numbers.
+- Sink with a Python consumer applying staged `MERGE`/`DELETE` to `JOBATLAS.CDC.JOBS_STREAM`, committing offsets only after a successful write (at-least-once with idempotent merges).
+
+**Consequences**
+- Near-real-time warehouse sync, no polling.
+- The consumer exposes a second sink seam for BigQuery, deferred until GCP setup.
+- `cdc.companies` deferred: no operational companies table exists yet (`dim_company` is a dbt mart); revisit with a `staging.companies` table.

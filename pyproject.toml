@@ -29,6 +29,11 @@ dev = [
     "pre-commit>=3.8",
     "pytest>=8.3",
     "pytest-cov>=5.0",
+
+]
+streaming = [
+    "confluent-kafka>=2.4",
+    "snowflake-connector-python>=3.7",
 ]
 embeddings = ["sentence-transformers>=2.7"]
 
