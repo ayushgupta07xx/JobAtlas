@@ -109,3 +109,7 @@ warehouse/dbt_project/target/
 warehouse/dbt_project/dbt_packages/
 warehouse/dbt_project/logs/
 warehouse/dbt_project/seeds/*.csv
+
+# Great Expectations runtime output (validation results + data docs)
+warehouse/great_expectations/gx/
+.venv-gx/

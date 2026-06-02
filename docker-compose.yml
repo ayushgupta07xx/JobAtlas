@@ -33,6 +33,7 @@ x-airflow-common: &airflow-common
     - ./apps:/opt/jobatlas/apps
     - ./scrapers:/opt/jobatlas/scrapers
     - ./.env:/opt/jobatlas/.env:ro
+    - ./warehouse/great_expectations:/opt/jobatlas/warehouse/great_expectations:ro
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:
     postgres:

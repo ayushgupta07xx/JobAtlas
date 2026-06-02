@@ -18,3 +18,12 @@ RUN /opt/jobatlas-venv/bin/pip install --no-cache-dir --retries 10 "/tmp/build[e
     && chown -R airflow:0 /opt/jobatlas-venv
 USER airflow
 RUN /opt/jobatlas-venv/bin/python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('BAAI/bge-small-en-v1.5')"
+# GX runs in its OWN venv: GX 1.x needs SQLAlchemy 2.x, Airflow pins <2.0, and the
+# app venv is separate too. Appended last so the torch/BGE layers above stay cached.
+USER root
+# hadolint ignore=DL3013
+RUN python3 -m venv /opt/jobatlas-gx-venv \
+    && /opt/jobatlas-gx-venv/bin/pip install --no-cache-dir --upgrade pip \
+    && /opt/jobatlas-gx-venv/bin/pip install --no-cache-dir --retries 10 "great-expectations[postgresql]>=1.17" python-dotenv \
+    && chown -R airflow:0 /opt/jobatlas-gx-venv
+USER airflow

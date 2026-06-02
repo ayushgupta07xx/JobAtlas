@@ -152,3 +152,11 @@ The warehouse must reflect operational changes to `staging.jobs` without batch r
 - Near-real-time warehouse sync, no polling.
 - The consumer exposes a second sink seam for BigQuery, deferred until GCP setup.
 - `cdc.companies` deferred: no operational companies table exists yet (`dim_company` is a dbt mart); revisit with a `staging.companies` table.
+
+## ADR-0012 — Great Expectations runs in an isolated `.venv-gx`
+
+**Context:** GX 1.x pulls a heavy dependency tree (pandas, numpy, SQLAlchemy 2.x, altair, marshmallow) that conflicts with the app `.venv`'s pinned Scrapy / confluent-kafka / snowflake-connector stack. Airflow's own runtime is pinned to SQLAlchemy 1.4.52, which GX 1.x does not support either.
+
+**Decision:** GX lives in a dedicated `.venv-gx`, with deps in `warehouse/great_expectations/requirements.txt`, mirroring the `.venv-dbt` isolation pattern from ADR-0008. Suites are defined programmatically via the GX 1.x Fluent API (no CLI scaffold) and validated against local Postgres via a file-backed context at `warehouse/great_expectations/gx/`. The Airflow integration bakes GX into its own venv inside the `jobatlas/airflow:2.9.3` image, separate from both Airflow's env and the baked `/opt/jobatlas-venv`; the app `.venv` is never modified.
+
+**Status:** Accepted.
