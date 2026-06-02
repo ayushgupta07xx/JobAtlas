@@ -85,3 +85,43 @@ models:
               arguments:
                 to: ref('dim_skill')
                 field: skill_sk
+  - name: mart_skill_demand
+    description: "Job count per skill (dashboard + heatmap source)."
+    columns:
+      - name: skill_name
+        tests: [unique, not_null]
+      - name: job_count
+        tests: [not_null]
+  - name: mart_skill_demand_by_city
+    description: "Skill demand by city (heatmap source)."
+    columns:
+      - name: city
+        tests: [not_null]
+      - name: skill_name
+        tests: [not_null]
+  - name: mart_salary_by_city
+    description: "Salary aggregates by city and currency (currencies kept separate)."
+    columns:
+      - name: city
+        tests: [not_null]
+  - name: mart_top_companies
+    description: "Companies ranked by number of open postings."
+    columns:
+      - name: company_name
+        tests: [unique, not_null]
+      - name: job_count
+        tests: [not_null]
+  - name: mart_hiring_velocity
+    description: "Postings per day (hiring velocity)."
+    columns:
+      - name: posted_date
+        tests: [unique, not_null]
+      - name: jobs_posted
+        tests: [not_null]
+  - name: mart_jobs_by_source
+    description: "Job volume by source."
+    columns:
+      - name: source
+        tests: [unique, not_null]
+      - name: job_count
+        tests: [not_null]
