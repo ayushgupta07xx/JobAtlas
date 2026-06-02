@@ -12,6 +12,11 @@ select
     extract(quarter from date_day)                 as quarter,
     extract(month   from date_day)                 as month,
     extract(day     from date_day)                 as day_of_month,
-    extract(dow     from date_day)                 as day_of_week,
+    {% if target.name == 'postgres' %}
+    extract(dow from date_day)                     as day_of_week,
     trim(to_char(date_day, 'Day'))                 as day_name
+    {% else %}
+    dayofweek(date_day)                            as day_of_week,
+    dayname(date_day)                              as day_name
+    {% endif %}
 from spine

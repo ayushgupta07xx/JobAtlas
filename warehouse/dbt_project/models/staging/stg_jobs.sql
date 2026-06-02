@@ -1,5 +1,10 @@
+-- Postgres reads the live source; other targets read the seed (multi-warehouse demo).
 with source as (
+    {% if target.name == 'postgres' %}
     select * from {{ source('jobatlas', 'jobs') }}
+    {% else %}
+    select * from {{ ref('jobs_seed') }}
+    {% endif %}
 )
 select
     id,
@@ -17,7 +22,11 @@ select
     nullif(trim(currency), '') as currency,
     posted_date,
     description,
+    {% if target.name == 'postgres' %}
     skills,
+    {% else %}
+    cast(null as varchar) as skills,
+    {% endif %}
     content_hash,
     is_active,
     is_duplicate,
