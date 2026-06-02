@@ -1,8 +1,9 @@
-"""Lazy BGE-small loader.
+"""Lazy BGE-small loader via fastembed (ONNX, no torch).
 
-Imports sentence-transformers only on first use, so the API starts without
-torch loaded and only pays the memory cost when a semantic query or resume
-match actually needs an embedding.
+Query-side embeddings for /search and /match. Uses the ONNX build of
+BAAI/bge-small-en-v1.5 so the API stays lightweight (~200 MB) and fits
+free-tier hosting. Vectors are compatible with the pgvector job
+embeddings produced by sentence-transformers in the ingestion pipeline.
 """
 
 from __future__ import annotations
@@ -14,12 +15,12 @@ from apps.api.config import settings
 
 @lru_cache(maxsize=1)
 def _model():
-    from sentence_transformers import SentenceTransformer
+    from fastembed import TextEmbedding
 
-    return SentenceTransformer(settings.embedding_model)
+    return TextEmbedding(model_name=settings.embedding_model)
 
 
 @lru_cache(maxsize=512)
 def embed_text(text_value: str) -> list[float]:
-    vec = _model().encode(text_value, normalize_embeddings=True)
-    return [float(x) for x in vec.tolist()]
+    vec = next(iter(_model().embed([text_value])))
+    return [float(x) for x in vec]

@@ -14,7 +14,7 @@ app.include_router(match.router)
 app.include_router(analytics.router)
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"http://localhost:\d+",
+    allow_origin_regex=r"http://localhost:\d+|https://.*\.vercel\.app",
     allow_methods=["*"],
     allow_headers=["*"],
 )
