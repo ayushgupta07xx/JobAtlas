@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import io
+import re
+from typing import Any
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy import bindparam, text
@@ -16,6 +18,10 @@ from jobatlas.sources import MATCH_EXCLUDED_SOURCES
 
 router = APIRouter(tags=["match"])
 
+RERANK_POOL = 50
+W_COS = 0.6
+W_SKILL = 0.4
+
 _MATCH_SQL = text(
     """
     SELECT j.id, j.title, j.company, j.city, j.state, j.country, j.source,
@@ -27,7 +33,7 @@ _MATCH_SQL = text(
     WHERE j.is_active = true AND j.is_duplicate = false
       AND j.source NOT IN :excluded
     ORDER BY e.embedding <=> CAST(:qvec AS vector)
-    LIMIT :limit
+    LIMIT :pool
     """
 ).bindparams(bindparam("excluded", expanding=True))
 
@@ -45,11 +51,49 @@ def _extract_text(file: UploadFile, raw: bytes) -> str:
         raise HTTPException(status_code=415, detail="Unsupported file type") from exc
 
 
+def _as_skill_list(val: Any) -> list[str]:
+    if isinstance(val, list):
+        return [str(s).strip().lower() for s in val if str(s).strip()]
+    if isinstance(val, str):
+        return [p.strip().lower() for p in re.split(r"[;,]", val) if p.strip()]
+    return []
+
+
+def _resume_skills(resume_text: str, vocab: set[str]) -> set[str]:
+    cleaned = re.sub(r"[^a-z0-9+#. ]", " ", resume_text.lower())
+    tokens = set(cleaned.split())
+    found: set[str] = set()
+    for skill in vocab:
+        hit = skill in cleaned if " " in skill else skill in tokens
+        if hit:
+            found.add(skill)
+    return found
+
+
+def _rerank(rows: list[dict[str, Any]], resume_text: str, limit: int) -> list[dict[str, Any]]:
+    per_job: dict[Any, set[str]] = {}
+    vocab: set[str] = set()
+    for r in rows:
+        sk = set(_as_skill_list(r.get("skills")))
+        per_job[r["id"]] = sk
+        vocab |= sk
+    rskills = _resume_skills(resume_text, vocab)
+
+    def blended(r: dict[str, Any]) -> float:
+        sk = per_job[r["id"]]
+        cos = float(r.get("score") or 0.0)
+        coverage = len(sk & rskills) / len(sk) if sk else 0.0
+        return W_COS * cos + W_SKILL * coverage
+
+    return sorted(rows, key=blended, reverse=True)[:limit]
+
+
 @router.post("/match", response_model=SearchResponse)
 def match(
     db: Session = Depends(get_session),
     file: UploadFile = File(...),
     limit: int = Query(default=settings.search_default_limit, ge=1, le=settings.search_max_limit),
+    variant: str = Query(default="control"),
 ) -> SearchResponse:
     raw = file.file.read()
     resume_text = _extract_text(file, raw).strip()
@@ -57,13 +101,16 @@ def match(
         raise HTTPException(status_code=422, detail="Could not extract resume text")
     vec = embed_text(resume_text)
     qvec = "[" + ",".join(f"{x:.6f}" for x in vec) + "]"
-    rows = (
-        db.execute(
+    pool = max(limit, RERANK_POOL) if variant == "test" else limit
+    rows: list[dict[str, Any]] = [
+        dict(r)
+        for r in db.execute(
             _MATCH_SQL,
-            {"qvec": qvec, "limit": limit, "excluded": list(MATCH_EXCLUDED_SOURCES)},
+            {"qvec": qvec, "pool": pool, "excluded": list(MATCH_EXCLUDED_SOURCES)},
         )
         .mappings()
         .all()
-    )
-    hits = [SearchHit(**row) for row in rows]
+    ]
+    ranked = _rerank(rows, resume_text, limit) if variant == "test" else rows[:limit]
+    hits = [SearchHit(**row) for row in ranked]
     return SearchResponse(count=len(hits), query="resume", results=hits)

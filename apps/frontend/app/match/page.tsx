@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import posthog from "posthog-js";
 
 import { JobCard } from "@/components/JobCard";
 import { matchResume, type SearchHit } from "@/lib/api";
@@ -16,16 +17,24 @@ export default function MatchPage() {
     if (!file) return;
     setLoading(true);
     setError(null);
+    // Reading the flag fires the PostHog experiment exposure ($feature_flag_called).
+    const flag = posthog.getFeatureFlag("match_algo_v2");
+    const variant = flag === "test" ? "test" : "control";
+    const t0 = performance.now();
     try {
-      const res = await matchResume(file, 12);
+      const res = await matchResume(file, 12, variant);
+      const latency_ms = Math.round(performance.now() - t0);
       setHits(res.results);
       track(EVENTS.MATCH_REQUESTED, {
         num_matches_returned: res.results.length,
+        algo_variant: variant,
+        latency_ms,
       });
       if (res.results.length > 0) {
         track(EVENTS.MATCH_SCORE_REVEALED, {
           num_results: res.results.length,
           top_score: res.results[0].score ?? null,
+          algo_variant: variant,
         });
       }
     } catch {
