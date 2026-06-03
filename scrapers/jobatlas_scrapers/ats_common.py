@@ -49,6 +49,9 @@ GREENHOUSE: dict[str, str] = {
     "groww": "Groww",
     "phonepe": "PhonePe",
     "slice": "Slice",
+    "twilio": "Twilio",
+    "elastic": "Elastic",
+    "samsara": "Samsara",
 }
 
 # --- Lever: EXAMPLES -- verify each at jobs.lever.co/<slug> before relying on it.
@@ -59,6 +62,7 @@ LEVER: dict[str, str] = {
     "stable-money1": "Stable Money",
     "cred": "CRED",
     "fampay": "FamPay",
+    "epifi": "Fi Money",
 }
 
 # --- Ashby: EXAMPLES -- verify each at jobs.ashbyhq.com/<slug>.
@@ -67,6 +71,8 @@ ASHBY: dict[str, str] = {
     "ramp": "Ramp",
     "vanta": "Vanta",
     "atlan": "Atlan",
+    "composio": "Composio",
+    "spotdraft": "SpotDraft",
 }
 
 # Lowercase tokens that mark a posting as India-relevant. High-precision on
