@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { JobCard } from "@/components/JobCard";
 import { searchJobs, type SearchHit } from "@/lib/api";
+import { track, EVENTS } from "@/lib/analytics";
 
 const SOURCES = ["adzuna", "jobicy"];
 
@@ -14,7 +15,7 @@ export default function HomePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function run() {
+  async function run(trigger?: "query" | "filter") {
     setLoading(true);
     setError(null);
     try {
@@ -24,6 +25,21 @@ export default function HomePage() {
         limit: 24,
       });
       setHits(res.results);
+      if (trigger) {
+        track(EVENTS.SEARCH_EXECUTED, {
+          query: q,
+          source: source ?? "all",
+          num_results: res.results.length,
+          trigger,
+        });
+        if (res.results.length === 0) {
+          track(EVENTS.SEARCH_RETURNED_EMPTY, {
+            query: q,
+            source: source ?? "all",
+            trigger,
+          });
+        }
+      }
     } catch {
       setError("Could not reach the API. Is it running on :8000?");
     } finally {
@@ -31,8 +47,14 @@ export default function HomePage() {
     }
   }
 
+  const firstLoad = useRef(true);
   useEffect(() => {
-    run();
+    if (firstLoad.current) {
+      firstLoad.current = false;
+      run();
+      return;
+    }
+    run("filter");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [source]);
 
@@ -54,12 +76,12 @@ export default function HomePage() {
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && run()}
+          onKeyDown={(e) => e.key === "Enter" && run("query")}
           placeholder="Try: data engineer in Bangalore"
           className="flex-1 rounded-lg border border-ink/15 bg-white/60 px-4 py-3 outline-none focus:border-accent"
         />
         <button
-          onClick={run}
+          onClick={() => run("query")}
           className="rounded-lg bg-ink px-6 py-3 font-medium text-paper transition hover:bg-accent"
         >
           Search
@@ -67,13 +89,23 @@ export default function HomePage() {
       </div>
 
       <div className="mb-6 flex flex-wrap gap-2">
-        <Chip label="All" active={source === null} onClick={() => setSource(null)} />
+        <Chip
+          label="All"
+          active={source === null}
+          onClick={() => {
+            track(EVENTS.FILTER_CLEARED, { filter_type: "source" });
+            setSource(null);
+          }}
+        />
         {SOURCES.map((s) => (
           <Chip
             key={s}
             label={s}
             active={source === s}
-            onClick={() => setSource(s)}
+            onClick={() => {
+              track(EVENTS.FILTER_APPLIED, { filter_type: "source", filter_value: s });
+              setSource(s);
+            }}
           />
         ))}
       </div>
@@ -83,8 +115,8 @@ export default function HomePage() {
         <p className="text-ink/50">Searching…</p>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
-          {hits.map((job) => (
-            <JobCard key={job.id} job={job} />
+          {hits.map((job, i) => (
+            <JobCard key={job.id} job={job} position={i} />
           ))}
         </div>
       )}

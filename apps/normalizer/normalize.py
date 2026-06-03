@@ -111,11 +111,16 @@ def main() -> None:
             log.info("nothing to upsert (skipped=%d)", skipped)
             return
 
-        ins = pg_insert(Job).values(rows)
-        update_set = {c: getattr(ins.excluded, c) for c in _UPDATE_COLS}
-        update_set["updated_at"] = func.now()
-        ins = ins.on_conflict_do_update(constraint="uq_jobs_source_url", set_=update_set)
-        session.execute(ins)
+        # Postgres caps one statement at 65535 bound params; at ~18 cols
+        # per row that is ~3600 rows, so chunk well under it for big harvests.
+        chunk_size = 1000
+        for start in range(0, len(rows), chunk_size):
+            chunk = rows[start : start + chunk_size]
+            ins = pg_insert(Job).values(chunk)
+            update_set = {c: getattr(ins.excluded, c) for c in _UPDATE_COLS}
+            update_set["updated_at"] = func.now()
+            ins = ins.on_conflict_do_update(constraint="uq_jobs_source_url", set_=update_set)
+            session.execute(ins)
         session.commit()
 
     engine.dispose()

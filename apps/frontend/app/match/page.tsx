@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { JobCard } from "@/components/JobCard";
 import { matchResume, type SearchHit } from "@/lib/api";
+import { track, EVENTS } from "@/lib/analytics";
 
 export default function MatchPage() {
   const [file, setFile] = useState<File | null>(null);
@@ -18,6 +19,15 @@ export default function MatchPage() {
     try {
       const res = await matchResume(file, 12);
       setHits(res.results);
+      track(EVENTS.MATCH_REQUESTED, {
+        num_matches_returned: res.results.length,
+      });
+      if (res.results.length > 0) {
+        track(EVENTS.MATCH_SCORE_REVEALED, {
+          num_results: res.results.length,
+          top_score: res.results[0].score ?? null,
+        });
+      }
     } catch {
       setError("Match failed. Is the API running on :8000?");
     } finally {
@@ -44,7 +54,16 @@ export default function MatchPage() {
             type="file"
             accept=".pdf,.txt"
             className="hidden"
-            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            onChange={(e) => {
+              const f = e.target.files?.[0] ?? null;
+              setFile(f);
+              if (f) {
+                track(EVENTS.RESUME_UPLOADED, {
+                  file_size_kb: Math.round(f.size / 1024),
+                  file_type: f.type || f.name.split(".").pop(),
+                });
+              }
+            }}
           />
         </label>
         <button
@@ -64,8 +83,8 @@ export default function MatchPage() {
       {error && <p className="text-sm text-accent">{error}</p>}
 
       <div className="grid gap-3 sm:grid-cols-2">
-        {hits.map((job) => (
-          <JobCard key={job.id} job={job} />
+        {hits.map((job, i) => (
+          <JobCard key={job.id} job={job} position={i} />
         ))}
       </div>
     </div>

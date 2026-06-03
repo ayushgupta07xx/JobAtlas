@@ -12,12 +12,14 @@ import {
 } from "recharts";
 
 import { salaryTrend, type SalaryRow } from "@/lib/api";
+import { track, EVENTS } from "@/lib/analytics";
 
 export default function SalaryPage() {
   const [rows, setRows] = useState<SalaryRow[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    track(EVENTS.SALARY_EXPLORER_VIEWED, {});
     salaryTrend(12)
       .then((res) => setRows(res.rows))
       .catch(() => setError("Could not load salary data."));

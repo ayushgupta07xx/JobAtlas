@@ -198,7 +198,7 @@ def parse_jobicy(p: dict) -> dict:
         "country": _geo_to_country(p.get("jobGeo")),
         "salary_min": _num(p.get("annualSalaryMin")),
         "salary_max": _num(p.get("annualSalaryMax")),
-        "currency": cur,
+        "currency": cur or "INR",
         "posted_date": _to_date(p.get("pubDate")),
         "description": desc,
         "skills": extract_skills(f"{p.get('jobTitle') or ''} {desc or ''}"),
@@ -206,3 +206,208 @@ def parse_jobicy(p: dict) -> dict:
 
 
 PARSERS = {"adzuna": parse_adzuna, "jobicy": parse_jobicy}
+
+
+# --- ATS feeds (Greenhouse / Lever / Ashby) --------------------------------
+# Each takes the verbatim board payload landed by its spider and maps it to the
+# normalized staging.jobs field dict. Defensive .get() throughout: a shape drift
+# yields nulls (caught by the GX gate) rather than crashing the normalizer.
+
+_IN_CITIES = (
+    "bengaluru",
+    "bangalore",
+    "mumbai",
+    "pune",
+    "hyderabad",
+    "delhi",
+    "gurgaon",
+    "gurugram",
+    "noida",
+    "chennai",
+    "kolkata",
+    "ahmedabad",
+)
+
+
+def _india_country(*parts: object) -> str:
+    blob = " ".join(str(p) for p in parts if p).lower()
+    if "india" in blob or any(c in blob for c in _IN_CITIES):
+        return "IN"
+    return "ZZ"  # India-eligible remote that passed the spider filter
+
+
+def _split_city_state(loc: object) -> tuple[str | None, str | None]:
+    if not loc:
+        return None, None
+    bits = [p.strip() for p in str(loc).split(",") if p.strip()]
+    if not bits:
+        return None, None
+    city = bits[0]
+    state = bits[1] if len(bits) >= 2 and bits[1].lower() != "india" else None
+    return city, state
+
+
+def parse_greenhouse(p: dict) -> dict:
+    loc = (p.get("location") or {}).get("name")
+    city, state = _split_city_state(loc)
+    desc = strip_html(p.get("content"))
+    title = p.get("title")
+    offices = " ".join(o.get("location") or "" for o in (p.get("offices") or []))
+    return {
+        "title": title,
+        "company": p.get("_company"),
+        "city": city,
+        "state": state,
+        "country": _india_country(loc, offices),
+        "salary_min": None,
+        "salary_max": None,
+        "currency": "INR",
+        "posted_date": _to_date(p.get("updated_at")),
+        "description": desc,
+        "skills": extract_skills(f"{title or ''} {desc or ''}"),
+    }
+
+
+def parse_lever(p: dict) -> dict:
+    cats = p.get("categories") or {}
+    loc = cats.get("location")
+    city, state = _split_city_state(loc)
+    desc = strip_html(p.get("description")) or p.get("descriptionPlain")
+    title = p.get("text")
+    sr = p.get("salaryRange") or {}
+    created = p.get("createdAt")
+    posted = (
+        datetime.fromtimestamp(created / 1000).date()
+        if isinstance(created, (int, float))
+        else _to_date(created)
+    )
+    cur = (sr.get("currency") or "").upper()[:3] or None
+    return {
+        "title": title,
+        "company": p.get("_company"),
+        "city": city,
+        "state": state,
+        "country": _india_country(loc, cats.get("allLocations")),
+        "salary_min": _num(sr.get("min")),
+        "salary_max": _num(sr.get("max")),
+        "currency": cur or "INR",
+        "posted_date": posted,
+        "description": desc,
+        "skills": extract_skills(f"{title or ''} {desc or ''}"),
+    }
+
+
+def parse_ashby(p: dict) -> dict:
+    loc = p.get("location")
+    city, state = _split_city_state(loc)
+    desc = p.get("descriptionPlain") or strip_html(p.get("descriptionHtml"))
+    title = p.get("title")
+    tiers = (p.get("compensation") or {}).get("compensationTiers") or []
+    smin = smax = cur = None
+    if tiers:
+        t0 = tiers[0] or {}
+        smin, smax = _num(t0.get("minValue")), _num(t0.get("maxValue"))
+        cur = (t0.get("currency") or "").upper()[:3] or None
+    addr = ((p.get("address") or {}).get("postalAddress")) or {}
+    return {
+        "title": title,
+        "company": p.get("_company"),
+        "city": city,
+        "state": state,
+        "country": _india_country(loc, addr.get("addressCountry"), addr.get("addressLocality")),
+        "salary_min": smin,
+        "salary_max": smax,
+        "currency": cur or "INR",
+        "posted_date": _to_date(p.get("publishedAt")),
+        "description": desc,
+        "skills": extract_skills(f"{title or ''} {desc or ''}"),
+    }
+
+
+PARSERS = {
+    **PARSERS,
+    "greenhouse": parse_greenhouse,
+    "lever": parse_lever,
+    "ashby": parse_ashby,
+}
+
+
+# --- remote feeds (RemoteOK / Remotive) ------------------------------------
+# Remote-first aggregators; we keep India-eligible roles only (filtered in the
+# spiders). country = IN when the location names India, else ZZ (worldwide).
+
+
+def parse_remoteok(p: dict) -> dict:
+    loc = p.get("location") or "Worldwide"
+    title = p.get("position") or p.get("title")
+    desc = strip_html(p.get("description"))
+    tags = " ".join(p.get("tags") or [])
+    return {
+        "title": title,
+        "company": p.get("company"),
+        "city": None,
+        "state": None,
+        "country": _india_country(loc),
+        "salary_min": _num(p.get("salary_min")),
+        "salary_max": _num(p.get("salary_max")),
+        "currency": "USD",
+        "posted_date": _to_date(p.get("date")),
+        "description": desc,
+        "skills": extract_skills(f"{title or ''} {tags} {desc or ''}"),
+    }
+
+
+def parse_remotive(p: dict) -> dict:
+    crl = p.get("candidate_required_location") or "Worldwide"
+    title = p.get("title")
+    desc = strip_html(p.get("description"))
+    tags = " ".join(p.get("tags") or [])
+    country = _india_country(crl)
+    return {
+        "title": title,
+        "company": p.get("company_name"),
+        "city": None,
+        "state": None,
+        "country": country,
+        "salary_min": None,
+        "salary_max": None,
+        "currency": "INR" if country == "IN" else "USD",
+        "posted_date": _to_date(p.get("publication_date")),
+        "description": desc,
+        "skills": extract_skills(f"{title or ''} {tags} {desc or ''}"),
+    }
+
+
+PARSERS = {**PARSERS, "remoteok": parse_remoteok, "remotive": parse_remotive}
+
+
+# --- The Muse (public API) -------------------------------------------------
+# Tech-category roles in India hubs; the spider already drops non-India rows.
+# The Muse exposes no salary, so currency defaults to INR (column is NOT NULL).
+
+
+def parse_themuse(p: dict) -> dict:
+    locs = [loc.get("name") for loc in (p.get("locations") or []) if loc.get("name")]
+    primary = locs[0] if locs else ""
+    city, state = _split_city_state(primary)
+    if state and state.strip().lower() == "india":
+        state = None
+    title = p.get("name")
+    desc = strip_html(p.get("contents"))
+    cats = " ".join(c.get("name", "") for c in (p.get("categories") or []))
+    return {
+        "title": title,
+        "company": (p.get("company") or {}).get("name"),
+        "city": city,
+        "state": state,
+        "country": _india_country(primary),
+        "salary_min": None,
+        "salary_max": None,
+        "currency": "INR",
+        "posted_date": _to_date(p.get("publication_date")),
+        "description": desc,
+        "skills": extract_skills(f"{title or ''} {cats} {desc or ''}"),
+    }
+
+
+PARSERS = {**PARSERS, "themuse": parse_themuse}

@@ -1,13 +1,22 @@
 import Link from "next/link";
 
 import { formatSalary, type SearchHit } from "@/lib/api";
+import { track, EVENTS } from "@/lib/analytics";
 
-export function JobCard({ job }: { job: SearchHit }) {
+export function JobCard({ job, position }: { job: SearchHit; position?: number }) {
   return (
     <article className="group rounded-lg border border-ink/10 bg-white/40 p-4 transition hover:border-accent/60 hover:shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <Link
           href={`/jobs/${job.id}`}
+          onClick={() =>
+            track(EVENTS.JOB_VIEWED, {
+              job_id: job.id,
+              source: job.source,
+              position_in_list: position,
+              score: job.score ?? null,
+            })
+          }
           className="font-display text-lg font-medium leading-snug group-hover:text-accent"
         >
           {job.title}

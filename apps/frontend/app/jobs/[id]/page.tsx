@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { formatSalary, getJob, type JobDetail } from "@/lib/api";
+import DOMPurify from "dompurify";
+import { track, EVENTS } from "@/lib/analytics";
 
 export default function JobDetailPage({
   params,
@@ -15,7 +17,10 @@ export default function JobDetailPage({
 
   useEffect(() => {
     getJob(params.id)
-      .then(setJob)
+      .then((j) => {
+        setJob(j);
+        track(EVENTS.JOB_DETAIL_OPENED, { job_id: j.id, source: j.source });
+      })
       .catch(() => setError("Job not found."));
   }, [params.id]);
 
@@ -71,16 +76,27 @@ export default function JobDetailPage({
         </div>
       )}
 
-      {job.description && (
-        <div className="mt-6 max-w-2xl whitespace-pre-line leading-relaxed text-ink/80">
-          {job.description}
-        </div>
-      )}
+      {job.description &&
+        (job.description.includes("</") ? (
+          <div
+            className="mt-6 max-w-2xl space-y-3 leading-relaxed text-ink/80"
+            dangerouslySetInnerHTML={{
+              __html: DOMPurify.sanitize(job.description),
+            }}
+          />
+        ) : (
+          <div className="mt-6 max-w-2xl whitespace-pre-line leading-relaxed text-ink/80">
+            {job.description}
+          </div>
+        ))}
 
       <a
         href={job.source_url}
         target="_blank"
         rel="noopener noreferrer"
+        onClick={() =>
+          track(EVENTS.APPLY_CLICKED, { job_id: job.id, source: job.source })
+        }
         className="mt-8 inline-block rounded-lg bg-ink px-6 py-3 font-medium text-paper transition hover:bg-accent"
       >
         Apply on {job.source} →

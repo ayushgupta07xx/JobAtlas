@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { Fraunces, Hanken_Grotesk } from "next/font/google";
-import Link from "next/link";
+import { Nav } from "@/components/Nav";
 import "./globals.css";
+import { PostHogProvider } from "./providers";
 
 const display = Fraunces({
   subsets: ["latin"],
@@ -28,31 +29,13 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${display.variable} ${body.variable}`}>
       <body className="min-h-screen bg-paper text-ink antialiased">
-        <header className="border-b border-ink/10">
-          <nav className="mx-auto flex max-w-5xl items-center justify-between px-5 py-4">
-            <Link
-              href="/"
-              className="font-display text-xl font-semibold tracking-tight"
-            >
-              Job<span className="text-accent">Atlas</span>
-            </Link>
-            <div className="flex items-center gap-5 text-sm font-medium">
-              <Link href="/" className="hover:text-accent">
-                Search
-              </Link>
-              <Link href="/match" className="hover:text-accent">
-                Match
-              </Link>
-              <Link href="/salary" className="hover:text-accent">
-                Salaries
-              </Link>
-            </div>
-          </nav>
-        </header>
+        <PostHogProvider>
+        <Nav />
         <main className="mx-auto max-w-5xl px-5 py-8">{children}</main>
         <footer className="mx-auto max-w-5xl px-5 py-10 text-xs text-ink/40">
           JobAtlas · unified India tech job search
         </footer>
+        </PostHogProvider>
       </body>
     </html>
   );

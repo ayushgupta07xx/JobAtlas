@@ -5,13 +5,14 @@ from __future__ import annotations
 import io
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
 from sqlalchemy.orm import Session
 
 from apps.api.config import settings
 from apps.api.db import get_session
 from apps.api.embeddings import embed_text
 from apps.api.schemas import SearchHit, SearchResponse
+from jobatlas.sources import MATCH_EXCLUDED_SOURCES
 
 router = APIRouter(tags=["match"])
 
@@ -24,10 +25,11 @@ _MATCH_SQL = text(
     FROM staging.jobs j
     JOIN staging.jobs_embeddings e ON e.job_id = j.id
     WHERE j.is_active = true AND j.is_duplicate = false
+      AND j.source NOT IN :excluded
     ORDER BY e.embedding <=> CAST(:qvec AS vector)
     LIMIT :limit
     """
-)
+).bindparams(bindparam("excluded", expanding=True))
 
 
 def _extract_text(file: UploadFile, raw: bytes) -> str:
@@ -55,6 +57,13 @@ def match(
         raise HTTPException(status_code=422, detail="Could not extract resume text")
     vec = embed_text(resume_text)
     qvec = "[" + ",".join(f"{x:.6f}" for x in vec) + "]"
-    rows = db.execute(_MATCH_SQL, {"qvec": qvec, "limit": limit}).mappings().all()
+    rows = (
+        db.execute(
+            _MATCH_SQL,
+            {"qvec": qvec, "limit": limit, "excluded": list(MATCH_EXCLUDED_SOURCES)},
+        )
+        .mappings()
+        .all()
+    )
     hits = [SearchHit(**row) for row in rows]
     return SearchResponse(count=len(hits), query="resume", results=hits)
