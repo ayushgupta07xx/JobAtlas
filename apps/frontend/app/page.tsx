@@ -34,7 +34,7 @@ function HomeBody() {
 
   const qParam = searchParams.get("q") ?? "";
   const sourceParam = searchParams.get("source") ?? "";
-  const sortParam = searchParams.get("sort") ?? "relevance";
+  const sortParam = searchParams.get("sort") ?? (qParam ? "relevance" : "salary");
   const pageParam = Math.max(
     1,
     Number.parseInt(searchParams.get("page") ?? "1", 10) || 1,
@@ -154,7 +154,6 @@ function HomeBody() {
       const isDefault =
         v === null ||
         v === "" ||
-        (k === "sort" && v === "relevance") ||
         (k === "page" && v === "1");
       if (isDefault) params.delete(k);
       else params.set(k, v);
