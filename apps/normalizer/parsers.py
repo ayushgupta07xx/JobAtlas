@@ -139,6 +139,67 @@ def parse_salary_text(value: str | None) -> tuple[float | None, float | None]:
     return (min(nums), max(nums)) if len(nums) > 1 else (nums[0], nums[0])
 
 
+# --- salary from free-text descriptions ------------------------------------
+# High-precision INR pay-range extractor for sources whose structured salary is
+# null (Adzuna recruiters often paste a range into the body). Anchors on a pay
+# cue, requires a ₹/INR symbol or a lakh/cr unit, ANNUALIZES "per month" figures,
+# handles ranges where only one bound carries the symbol, and bounds the result
+# -- so the §17 dashboards and salary regression never ingest a bad figure.
+_PAY_CUE = re.compile(
+    r"(pay range|salary|compensation|remuneration|\bctc\b|per annum|stipend)", re.I
+)
+_MONTHLY = re.compile(r"per month|/\s*month|\bmonthly\b", re.I)
+_CUR = r"(?:₹|rs\.?|inr)"
+_UNIT = r"(lpa|lakhs?|lacs?|crores?|cr|k)"
+_NUM = r"\d+(?:[,.]\d+)*"
+# range: A [to|-|–|—] B, currency optional on each, unit optional + shared
+_RANGE = re.compile(rf"{_CUR}?\s*({_NUM})\s*(?:to|[-–—])\s*{_CUR}?\s*({_NUM})\s*{_UNIT}?", re.I)
+# single amount: requires a currency prefix OR a trailing unit
+_SINGLE = re.compile(rf"(?:{_CUR}\s*({_NUM})\s*{_UNIT}?)|(?:({_NUM})\s*{_UNIT})", re.I)
+_UNIT_MULT = {
+    "lpa": 1e5,
+    "lakh": 1e5,
+    "lakhs": 1e5,
+    "lac": 1e5,
+    "lacs": 1e5,
+    "cr": 1e7,
+    "crore": 1e7,
+    "crores": 1e7,
+    "k": 1e3,
+}
+_SAL_LO, _SAL_HI = 50_000.0, 100_000_000.0
+
+
+def _to_inr(num: str, unit: str | None) -> float:
+    return float(num.replace(",", "")) * _UNIT_MULT.get((unit or "").lower(), 1.0)
+
+
+def salary_from_description(desc: str | None) -> tuple[float | None, float | None]:
+    """Best-effort annual-INR pay range from a description; (None, None) if absent."""
+    if not desc:
+        return None, None
+    cue = _PAY_CUE.search(desc)
+    if not cue:
+        return None, None
+    window = desc[cue.start() : cue.start() + 200]
+    factor = 12.0 if _MONTHLY.search(window) else 1.0
+    vals: list[float] = []
+    for m in _RANGE.finditer(window):
+        blob = m.group(0).lower()
+        if not (m.group(3) or "₹" in blob or "rs" in blob or "inr" in blob):
+            continue  # bare-number range (headcount, etc.) -- skip
+        vals += [_to_inr(m.group(1), m.group(3)), _to_inr(m.group(2), m.group(3))]
+    if not vals:  # no range matched; fall back to single tagged amounts
+        for m in _SINGLE.finditer(window):
+            num = m.group(1) or m.group(3)
+            if num:
+                vals.append(_to_inr(num, m.group(2) or m.group(4)))
+    vals = [v * factor for v in vals if _SAL_LO <= v * factor <= _SAL_HI]
+    if not vals:
+        return None, None
+    return (min(vals), max(vals)) if len(vals) > 1 else (vals[0], vals[0])
+
+
 # jobGeo -> ISO-3166 alpha-2 (best-effort; "ZZ" = unknown/worldwide).
 _GEO = {
     "usa": "US",

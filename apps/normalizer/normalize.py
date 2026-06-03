@@ -18,7 +18,7 @@ from sqlalchemy import create_engine, func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import sessionmaker
 
-from apps.normalizer.parsers import PARSERS
+from apps.normalizer.parsers import PARSERS, salary_from_description
 from jobatlas.db.models import Job, JobRaw
 from jobatlas.urls import canonicalize_url
 
@@ -93,6 +93,10 @@ def main() -> None:
                 skipped += 1
                 continue  # wellfound/naukri: no parser yet (Day-5 scope)
             fields = parser(r.payload or {})
+            if fields.get("salary_min") is None and fields.get("salary_max") is None:
+                s_min, s_max = salary_from_description(fields.get("description"))
+                if s_min is not None:
+                    fields["salary_min"], fields["salary_max"] = s_min, s_max
             if not fields.get("title") or not r.source_url:
                 skipped += 1
                 log.warning("skip raw id=%s (%s): missing title/url", r.id, r.source)
