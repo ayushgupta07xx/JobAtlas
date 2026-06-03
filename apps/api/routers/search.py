@@ -19,6 +19,11 @@ _BASE_COLS = """
     j.skills, j.scraped_at
 """
 
+# When there's a query, results are limited to the top-N most relevant jobs
+# (the candidate pool); the chosen sort then orders within that pool, so
+# Recency / Salary stay scoped to the search instead of the whole index.
+_RELEVANT_POOL = 200
+
 
 @router.get("/sources", response_model=list[SourceFacet])
 def sources(db: Session = Depends(get_session)) -> list[SourceFacet]:
@@ -68,44 +73,56 @@ def search(
         filters.append("(j.salary_min IS NOT NULL OR j.salary_max IS NOT NULL)")
     where = " AND ".join(filters)
 
-    # Semantic ranking applies only when there's a query AND the relevance sort.
-    use_semantic = bool(q) and sort == "relevance"
+    has_query = bool(q)
 
-    join = "JOIN staging.jobs_embeddings e ON e.job_id = j.id" if use_semantic else ""
-    total = db.execute(
-        text(f"SELECT count(*) FROM staging.jobs j {join} WHERE {where}"),
-        fparams,
-    ).scalar_one()
+    # Order applied to the result set. Unqualified column names work for both the
+    # single-table browse query and the SELECT over the candidate pool.
+    if sort == "salary":
+        result_order = "COALESCE(salary_max, salary_min) DESC, posted_date DESC NULLS LAST"
+    elif sort == "recency":
+        result_order = "posted_date DESC NULLS LAST, scraped_at DESC"
+    else:  # relevance
+        result_order = "score DESC" if has_query else "posted_date DESC NULLS LAST, scraped_at DESC"
+
+    join = "JOIN staging.jobs_embeddings e ON e.job_id = j.id" if has_query else ""
+    matching = int(
+        db.execute(
+            text(f"SELECT count(*) FROM staging.jobs j {join} WHERE {where}"),
+            fparams,
+        ).scalar_one()
+    )
 
     params: dict[str, object] = {**fparams, "limit": limit, "offset": offset}
-    if use_semantic:
-        assert q  # guaranteed by use_semantic; narrows for the type checker
+    if has_query:
+        assert q  # guaranteed by has_query; narrows for the type checker
         vec = embed_text(q)
         params["qvec"] = "[" + ",".join(f"{x:.6f}" for x in vec) + "]"
+        params["pool"] = _RELEVANT_POOL
+        total = min(_RELEVANT_POOL, matching)
         sql = text(
             f"""
-            SELECT {_BASE_COLS},
-                   1 - (e.embedding <=> CAST(:qvec AS vector)) AS score
-            FROM staging.jobs j
-            JOIN staging.jobs_embeddings e ON e.job_id = j.id
-            WHERE {where}
-            ORDER BY e.embedding <=> CAST(:qvec AS vector)
+            WITH pool AS (
+                SELECT {_BASE_COLS},
+                       1 - (e.embedding <=> CAST(:qvec AS vector)) AS score
+                FROM staging.jobs j
+                JOIN staging.jobs_embeddings e ON e.job_id = j.id
+                WHERE {where}
+                ORDER BY e.embedding <=> CAST(:qvec AS vector)
+                LIMIT :pool
+            )
+            SELECT * FROM pool
+            ORDER BY {result_order}
             LIMIT :limit OFFSET :offset
             """
         )
     else:
-        # salary: highest first, unlisted salaries last. recency (and relevance
-        # with no query): newest first.
-        if sort == "salary":
-            order_by = "COALESCE(j.salary_max, j.salary_min) DESC, j.posted_date DESC NULLS LAST"
-        else:
-            order_by = "j.posted_date DESC NULLS LAST, j.scraped_at DESC"
+        total = matching
         sql = text(
             f"""
             SELECT {_BASE_COLS}, NULL::float AS score
             FROM staging.jobs j
             WHERE {where}
-            ORDER BY {order_by}
+            ORDER BY {result_order}
             LIMIT :limit OFFSET :offset
             """
         )
