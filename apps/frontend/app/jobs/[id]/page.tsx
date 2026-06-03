@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { formatSalary, getJob, type JobDetail } from "@/lib/api";
@@ -12,6 +12,7 @@ export default function JobDetailPage({
 }: {
   params: { id: string };
 }) {
+  const router = useRouter();
   const [job, setJob] = useState<JobDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -24,13 +25,26 @@ export default function JobDetailPage({
       .catch(() => setError("Job not found."));
   }, [params.id]);
 
+  // Return to the previous search (preserves filters, sort, page, scroll).
+  // Falls back to home if the detail page was opened directly.
+  function goBack() {
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      router.back();
+    } else {
+      router.push("/");
+    }
+  }
+
   if (error) {
     return (
       <div>
         <p className="text-accent">{error}</p>
-        <Link href="/" className="mt-4 inline-block text-sm underline">
+        <button
+          onClick={goBack}
+          className="mt-4 inline-block text-sm underline"
+        >
           ← Back to search
-        </Link>
+        </button>
       </div>
     );
   }
@@ -39,9 +53,12 @@ export default function JobDetailPage({
 
   return (
     <article>
-      <Link href="/" className="text-sm text-ink/50 hover:text-accent">
+      <button
+        onClick={goBack}
+        className="text-sm text-ink/50 hover:text-accent"
+      >
         ← Back to search
-      </Link>
+      </button>
       <h1 className="mt-4 font-display text-3xl font-semibold leading-tight sm:text-4xl">
         {job.title}
       </h1>

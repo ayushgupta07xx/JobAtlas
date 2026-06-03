@@ -60,6 +60,7 @@ export function searchJobs(params: {
   city?: string;
   source?: string;
   salary_min?: number;
+  sort?: string;
   limit?: number;
   offset?: number;
 }): Promise<SearchResponse> {
