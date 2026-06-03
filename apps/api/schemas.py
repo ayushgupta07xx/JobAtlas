@@ -34,8 +34,14 @@ class SearchHit(JobOut):
 
 class SearchResponse(BaseModel):
     count: int
+    total: int = 0
     query: str | None = None
     results: list[SearchHit]
+
+
+class SourceFacet(BaseModel):
+    source: str
+    count: int
 
 
 class SalaryTrendRow(BaseModel):
