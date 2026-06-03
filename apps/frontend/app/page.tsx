@@ -51,7 +51,7 @@ function HomeBody() {
   const [error, setError] = useState<string | null>(null);
 
   const pendingTrigger = useRef<"query" | "filter" | null>(null);
-  const scrollRestored = useRef("");
+  const scrollRestored = useRef<string | null>(null);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const rangeStart = total === 0 ? 0 : (pageParam - 1) * PAGE_SIZE + 1;
