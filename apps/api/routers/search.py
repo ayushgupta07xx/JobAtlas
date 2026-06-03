@@ -1,4 +1,4 @@
-"""Search endpoint: structured filters + optional pgvector semantic ranking."""
+"""Search endpoint: structured filters + sort modes (relevance / salary / recency)."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ _BASE_COLS = """
 
 @router.get("/sources", response_model=list[SourceFacet])
 def sources(db: Session = Depends(get_session)) -> list[SourceFacet]:
-    """Distinct active, non-duplicate sources with job counts (for filter chips)."""
+    """Distinct active, non-duplicate sources with job counts (for the filter)."""
     sql = text(
         """
         SELECT j.source, count(*) AS count
@@ -41,8 +41,11 @@ def search(
     db: Session = Depends(get_session),
     q: str | None = Query(default=None, description="Semantic query text"),
     city: str | None = None,
-    source: str | None = None,
+    source: str | None = Query(
+        default=None, description="Comma-separated source filter (one or more)"
+    ),
     salary_min: float | None = None,
+    sort: str = Query(default="relevance", pattern="^(relevance|salary|recency)$"),
     limit: int = Query(default=settings.search_default_limit, ge=1, le=settings.search_max_limit),
     offset: int = Query(default=0, ge=0),
 ) -> SearchResponse:
@@ -52,24 +55,29 @@ def search(
         filters.append("lower(j.city) = lower(:city)")
         fparams["city"] = city
     if source:
-        filters.append("j.source = :source")
-        fparams["source"] = source
+        srcs = [s.strip() for s in source.split(",") if s.strip()]
+        if srcs:
+            placeholders = ", ".join(f":src{i}" for i in range(len(srcs)))
+            filters.append(f"j.source IN ({placeholders})")
+            for i, s in enumerate(srcs):
+                fparams[f"src{i}"] = s
     if salary_min is not None:
         filters.append("j.salary_max >= :salary_min")
         fparams["salary_min"] = salary_min
     where = " AND ".join(filters)
 
-    # Total matching rows (same filters, no LIMIT/OFFSET) so the client can page.
-    # The embeddings join only matters for the q-path; it doesn't change the set
-    # now that every active job has an embedding, but we mirror it for safety.
-    join = "JOIN staging.jobs_embeddings e ON e.job_id = j.id" if q else ""
+    # Semantic ranking applies only when there's a query AND the relevance sort.
+    use_semantic = bool(q) and sort == "relevance"
+
+    join = "JOIN staging.jobs_embeddings e ON e.job_id = j.id" if use_semantic else ""
     total = db.execute(
         text(f"SELECT count(*) FROM staging.jobs j {join} WHERE {where}"),
         fparams,
     ).scalar_one()
 
     params: dict[str, object] = {**fparams, "limit": limit, "offset": offset}
-    if q:
+    if use_semantic:
+        assert q  # guaranteed by use_semantic; narrows for the type checker
         vec = embed_text(q)
         params["qvec"] = "[" + ",".join(f"{x:.6f}" for x in vec) + "]"
         sql = text(
@@ -84,12 +92,18 @@ def search(
             """
         )
     else:
+        # salary: highest first, unlisted salaries last. recency (and relevance
+        # with no query): newest first.
+        if sort == "salary":
+            order_by = "j.salary_max DESC NULLS LAST, j.posted_date DESC NULLS LAST"
+        else:
+            order_by = "j.posted_date DESC NULLS LAST, j.scraped_at DESC"
         sql = text(
             f"""
             SELECT {_BASE_COLS}, NULL::float AS score
             FROM staging.jobs j
             WHERE {where}
-            ORDER BY j.posted_date DESC NULLS LAST, j.scraped_at DESC
+            ORDER BY {order_by}
             LIMIT :limit OFFSET :offset
             """
         )
