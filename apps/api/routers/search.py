@@ -64,6 +64,8 @@ def search(
     if salary_min is not None:
         filters.append("j.salary_max >= :salary_min")
         fparams["salary_min"] = salary_min
+    if sort == "salary":
+        filters.append("(j.salary_min IS NOT NULL OR j.salary_max IS NOT NULL)")
     where = " AND ".join(filters)
 
     # Semantic ranking applies only when there's a query AND the relevance sort.
@@ -95,7 +97,7 @@ def search(
         # salary: highest first, unlisted salaries last. recency (and relevance
         # with no query): newest first.
         if sort == "salary":
-            order_by = "j.salary_max DESC NULLS LAST, j.posted_date DESC NULLS LAST"
+            order_by = "COALESCE(j.salary_max, j.salary_min) DESC, j.posted_date DESC NULLS LAST"
         else:
             order_by = "j.posted_date DESC NULLS LAST, j.scraped_at DESC"
         sql = text(
