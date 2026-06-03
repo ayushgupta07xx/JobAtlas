@@ -179,7 +179,7 @@ function HomeBody() {
       track(EVENTS.FILTER_APPLIED, { filter_type: "source", filter_value: src });
     }
     pendingTrigger.current = "filter";
-    setParams({ source: [...set].join(",") || null, page: null });
+    setParams({ source: Array.from(set).join(",") || null, page: null });
   }
 
   function clearSources() {
