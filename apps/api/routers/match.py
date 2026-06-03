@@ -14,9 +14,13 @@ from apps.api.config import settings
 from apps.api.db import get_session
 from apps.api.embeddings import embed_text
 from apps.api.schemas import SearchHit, SearchResponse
-from jobatlas.sources import MATCH_EXCLUDED_SOURCES
 
 router = APIRouter(tags=["match"])
+
+# Mirrors jobatlas.sources.MATCH_EXCLUDED_SOURCES (source keys with
+# exclude_from_match=True). Inlined so apps/api ships standalone to the HF
+# Space without the jobatlas package; keep in sync if a source flag changes.
+MATCH_EXCLUDED_SOURCES: frozenset[str] = frozenset({"remotive"})
 
 RERANK_POOL = 50
 W_COS = 0.6
