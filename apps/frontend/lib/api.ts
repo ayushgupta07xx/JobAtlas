@@ -1,4 +1,5 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+
 export interface Job {
   id: number;
   title: string;
@@ -15,38 +16,52 @@ export interface Job {
   skills: string[] | null;
   scraped_at: string | null;
 }
+
 export interface JobDetail extends Job {
   description: string | null;
 }
+
 export interface SearchHit extends Job {
   score: number | null;
 }
+
 export interface SearchResponse {
   count: number;
+  total: number;
   query: string | null;
   results: SearchHit[];
 }
+
+export interface SourceFacet {
+  source: string;
+  count: number;
+}
+
 export interface SalaryRow {
   city: string;
   job_count: number;
   avg_salary_min: number | null;
   avg_salary_max: number | null;
 }
+
 export interface SalaryResponse {
   count: number;
   rows: SalaryRow[];
 }
+
 async function getJSON<T>(path: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`);
   if (!res.ok) throw new Error(`API ${res.status}`);
   return res.json() as Promise<T>;
 }
+
 export function searchJobs(params: {
   q?: string;
   city?: string;
   source?: string;
   salary_min?: number;
   limit?: number;
+  offset?: number;
 }): Promise<SearchResponse> {
   const qs = new URLSearchParams();
   Object.entries(params).forEach(([k, v]) => {
@@ -54,12 +69,19 @@ export function searchJobs(params: {
   });
   return getJSON<SearchResponse>(`/search?${qs.toString()}`);
 }
+
+export function getSources(): Promise<SourceFacet[]> {
+  return getJSON<SourceFacet[]>("/sources");
+}
+
 export function getJob(id: number | string): Promise<JobDetail> {
   return getJSON<JobDetail>(`/jobs/${id}`);
 }
+
 export function salaryTrend(limit = 12): Promise<SalaryResponse> {
   return getJSON<SalaryResponse>(`/analytics/salary-trend?limit=${limit}`);
 }
+
 export async function matchResume(
   file: File,
   limit = 10,
@@ -77,6 +99,7 @@ export async function matchResume(
   if (!res.ok) throw new Error(`API ${res.status}`);
   return res.json() as Promise<SearchResponse>;
 }
+
 export function formatSalary(
   min: number | null,
   max: number | null,
