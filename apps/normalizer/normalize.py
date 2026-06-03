@@ -20,6 +20,7 @@ from sqlalchemy.orm import sessionmaker
 
 from apps.normalizer.parsers import PARSERS
 from jobatlas.db.models import Job, JobRaw
+from jobatlas.urls import canonicalize_url
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 log = logging.getLogger("normalizer")
@@ -81,8 +82,9 @@ def main() -> None:
 
         sig_map = _minhash_map(mongo_db, [r.mongo_object_id for r in raws])
 
-        # Dedupe within the batch by (source, source_url); last (highest id) wins.
-        # Prevents "ON CONFLICT cannot affect row twice" when jobs_raw has dups.
+        # Dedupe within the batch by (source, canonical source_url); last (highest id)
+        # wins. Prevents "ON CONFLICT cannot affect row twice" when jobs_raw has dups,
+        # and collapses re-fetched param-variants (Adzuna se=/v=) onto one row.
         dedup: dict[tuple[str, str], dict] = {}
         skipped = 0
         for r in raws:
@@ -95,11 +97,12 @@ def main() -> None:
                 skipped += 1
                 log.warning("skip raw id=%s (%s): missing title/url", r.id, r.source)
                 continue
-            dedup[(r.source, r.source_url)] = {
+            canon_url = canonicalize_url(r.source_url)
+            dedup[(r.source, canon_url)] = {
                 "raw_id": r.id,
                 "source": r.source,
                 "source_job_id": r.source_job_id,
-                "source_url": r.source_url,
+                "source_url": canon_url,
                 "content_hash": r.content_hash,
                 "scraped_at": r.scraped_at,
                 "minhash_signature": sig_map.get(r.mongo_object_id or ""),
