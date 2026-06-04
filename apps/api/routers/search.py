@@ -20,9 +20,13 @@ _BASE_COLS = """
 """
 
 # When there's a query, results are limited to the top-N most relevant jobs
-# (the candidate pool); the chosen sort then orders within that pool, so
-# Recency / Salary stay scoped to the search instead of the whole index.
+# (the candidate pool); the chosen sort then orders within that pool.
 _RELEVANT_POOL = 200
+
+# pgvector's HNSW index returns at most `hnsw.ef_search` candidates per query
+# (default 40), which silently caps the pool far below _RELEVANT_POOL. Set it
+# comfortably above the pool size for full retrieval and good recall.
+_HNSW_EF_SEARCH = 400
 
 
 @router.get("/sources", response_model=list[SourceFacet])
@@ -75,8 +79,6 @@ def search(
 
     has_query = bool(q)
 
-    # Order applied to the result set. Unqualified column names work for both the
-    # single-table browse query and the SELECT over the candidate pool.
     if sort == "salary":
         result_order = "COALESCE(salary_max, salary_min) DESC, posted_date DESC NULLS LAST"
     elif sort == "recency":
@@ -84,21 +86,32 @@ def search(
     else:  # relevance
         result_order = "score DESC" if has_query else "posted_date DESC NULLS LAST, scraped_at DESC"
 
-    join = "JOIN staging.jobs_embeddings e ON e.job_id = j.id" if has_query else ""
-    matching = int(
-        db.execute(
-            text(f"SELECT count(*) FROM staging.jobs j {join} WHERE {where}"),
-            fparams,
-        ).scalar_one()
-    )
-
-    params: dict[str, object] = {**fparams, "limit": limit, "offset": offset}
     if has_query:
         assert q  # guaranteed by has_query; narrows for the type checker
         vec = embed_text(q)
-        params["qvec"] = "[" + ",".join(f"{x:.6f}" for x in vec) + "]"
-        params["pool"] = _RELEVANT_POOL
-        total = min(_RELEVANT_POOL, matching)
+        qvec = "[" + ",".join(f"{x:.6f}" for x in vec) + "]"
+        # Lift the HNSW candidate ceiling so the pool can actually reach _RELEVANT_POOL.
+        db.execute(text(f"SET hnsw.ef_search = {_HNSW_EF_SEARCH}"))
+        cparams = {**fparams, "qvec": qvec, "pool": _RELEVANT_POOL}
+        # total = the real size of the candidate pool (never more than is paginatable).
+        total = int(
+            db.execute(
+                text(
+                    f"""
+                    SELECT count(*) FROM (
+                        SELECT 1
+                        FROM staging.jobs j
+                        JOIN staging.jobs_embeddings e ON e.job_id = j.id
+                        WHERE {where}
+                        ORDER BY e.embedding <=> CAST(:qvec AS vector)
+                        LIMIT :pool
+                    ) sub
+                    """
+                ),
+                cparams,
+            ).scalar_one()
+        )
+        params = {**cparams, "limit": limit, "offset": offset}
         sql = text(
             f"""
             WITH pool AS (
@@ -116,7 +129,12 @@ def search(
             """
         )
     else:
-        total = matching
+        total = int(
+            db.execute(
+                text(f"SELECT count(*) FROM staging.jobs j WHERE {where}"), fparams
+            ).scalar_one()
+        )
+        params = {**fparams, "limit": limit, "offset": offset}
         sql = text(
             f"""
             SELECT {_BASE_COLS}, NULL::float AS score

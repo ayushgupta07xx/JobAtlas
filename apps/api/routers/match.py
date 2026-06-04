@@ -36,6 +36,10 @@ MATCH_POOL = 200
 W_COS = 0.6
 W_SKILL = 0.4
 
+# pgvector's HNSW index returns at most `hnsw.ef_search` candidates per query
+# (default 40), which would cap the pool far below MATCH_POOL. Lift it.
+_HNSW_EF_SEARCH = 400
+
 _BASE_COLS = """
     j.id, j.title, j.company, j.city, j.state, j.country, j.source,
     j.source_url, j.salary_min, j.salary_max, j.currency, j.posted_date,
@@ -140,6 +144,9 @@ def match(
     if sort == "salary":
         filters.append("(j.salary_min IS NOT NULL OR j.salary_max IS NOT NULL)")
     where = " AND ".join(filters)
+
+    # Lift the HNSW candidate ceiling so the pool can reach MATCH_POOL.
+    db.execute(text(f"SET hnsw.ef_search = {_HNSW_EF_SEARCH}"))
 
     pool_sql = text(
         f"""
