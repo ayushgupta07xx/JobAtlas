@@ -85,18 +85,24 @@ export function salaryTrend(limit = 12): Promise<SalaryResponse> {
 
 export async function matchResume(
   file: File,
-  limit = 10,
-  variant = "control",
+  opts: {
+    limit?: number;
+    offset?: number;
+    sort?: string;
+    source?: string;
+    variant?: string;
+  } = {},
 ): Promise<SearchResponse> {
   const form = new FormData();
   form.append("file", file);
-  const res = await fetch(
-    `${API_BASE}/match?limit=${limit}&variant=${variant}`,
-    {
-      method: "POST",
-      body: form,
-    },
-  );
+  const qs = new URLSearchParams();
+  Object.entries(opts).forEach(([k, v]) => {
+    if (v !== undefined && v !== "") qs.set(k, String(v));
+  });
+  const res = await fetch(`${API_BASE}/match?${qs.toString()}`, {
+    method: "POST",
+    body: form,
+  });
   if (!res.ok) throw new Error(`API ${res.status}`);
   return res.json() as Promise<SearchResponse>;
 }
