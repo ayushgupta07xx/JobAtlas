@@ -1,12 +1,9 @@
 "use client";
-
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-
 import { formatSalary, getJob, type JobDetail } from "@/lib/api";
 import DOMPurify from "dompurify";
 import { track, EVENTS } from "@/lib/analytics";
-
 export default function JobDetailPage({
   params,
 }: {
@@ -15,7 +12,6 @@ export default function JobDetailPage({
   const router = useRouter();
   const [job, setJob] = useState<JobDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
-
   useEffect(() => {
     getJob(params.id)
       .then((j) => {
@@ -24,7 +20,6 @@ export default function JobDetailPage({
       })
       .catch(() => setError("Job not found."));
   }, [params.id]);
-
   // Return to the previous search (preserves filters, sort, page, scroll).
   // Falls back to home if the detail page was opened directly.
   function goBack() {
@@ -34,7 +29,6 @@ export default function JobDetailPage({
       router.push("/");
     }
   }
-
   if (error) {
     return (
       <div>
@@ -48,9 +42,7 @@ export default function JobDetailPage({
       </div>
     );
   }
-
   if (!job) return <p className="text-ink/50">Loading…</p>;
-
   return (
     <article>
       <button
@@ -67,7 +59,6 @@ export default function JobDetailPage({
         {job.city ? ` · ${job.city}` : ""}
         {job.state ? `, ${job.state}` : ""}
       </p>
-
       <div className="mt-5 flex flex-wrap items-center gap-3 text-sm">
         <span className="rounded-lg bg-accent/10 px-3 py-1 font-medium text-accent">
           {formatSalary(job.salary_min, job.salary_max)}
@@ -79,7 +70,6 @@ export default function JobDetailPage({
           <span className="text-ink/50">Posted {job.posted_date}</span>
         )}
       </div>
-
       {job.skills && job.skills.length > 0 && (
         <div className="mt-5 flex flex-wrap gap-2">
           {job.skills.map((s) => (
@@ -92,7 +82,6 @@ export default function JobDetailPage({
           ))}
         </div>
       )}
-
       {job.description &&
         (job.description.includes("</") ? (
           <div
@@ -106,7 +95,11 @@ export default function JobDetailPage({
             {job.description}
           </div>
         ))}
-
+      {job.source === "adzuna" && (
+        <p className="mt-3 max-w-2xl text-xs italic text-ink/40">
+          Preview only — full description on the employer&apos;s site.
+        </p>
+      )}
       <a
         href={job.source_url}
         target="_blank"
