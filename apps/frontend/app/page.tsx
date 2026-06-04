@@ -1,28 +1,28 @@
 "use client";
 
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { JobCard } from "@/components/JobCard";
 import {
-  searchJobs,
   getSources,
+  searchJobs,
   type SearchHit,
   type SourceFacet,
 } from "@/lib/api";
-import { track, EVENTS } from "@/lib/analytics";
+import { EVENTS, track } from "@/lib/analytics";
 
 const PAGE_SIZE = 24;
 
 const SORTS = [
   { value: "relevance", label: "Relevance" },
-  { value: "salary", label: "Salary · High to Low" },
+  { value: "salary", label: "Salary \u00b7 High to Low" },
   { value: "recency", label: "Recency" },
 ];
 
 export default function HomePage() {
   return (
-    <Suspense fallback={<p className="text-ink/50">Loading…</p>}>
+    <Suspense fallback={<p className="px-6 py-10 text-ink/50">{"Loading\u2026"}</p>}>
       <HomeBody />
     </Suspense>
   );
@@ -51,7 +51,8 @@ function HomeBody() {
   const [error, setError] = useState<string | null>(null);
 
   const pendingTrigger = useRef<"query" | "filter" | null>(null);
-  const scrollRestored = useRef<string | null>(null);
+  const pendingScroll = useRef<number | null>(null);
+  const scrollHandled = useRef<string | null>(null);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const rangeStart = total === 0 ? 0 : (pageParam - 1) * PAGE_SIZE + 1;
@@ -68,6 +69,15 @@ function HomeBody() {
       .then(setSourceList)
       .catch(() => setSourceList([]));
   }, []);
+
+  // Capture the saved scroll for this view on entry, before the scroll
+  // listener (or the router's reset) can overwrite it.
+  useEffect(() => {
+    const key = searchParams.toString();
+    if (scrollHandled.current === key) return;
+    const saved = sessionStorage.getItem(`home-scroll:${key}`);
+    pendingScroll.current = saved !== null ? Number(saved) || 0 : null;
+  }, [searchParams]);
 
   // Fetch whenever committed params change (search / filter / sort / page / back).
   useEffect(() => {
@@ -117,7 +127,7 @@ function HomeBody() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [qParam, sourceParam, sortParam, pageParam]);
 
-  // Save scroll position per result-set, so returning from a job restores it.
+  // Persist scroll position per result-set as the user scrolls.
   useEffect(() => {
     const key = `home-scroll:${searchParams.toString()}`;
     let ticking = false;
@@ -136,13 +146,19 @@ function HomeBody() {
     };
   }, [searchParams]);
 
-  // Restore scroll once the matching result-set has loaded.
+  // Once the result-set has rendered, jump to the captured scroll, deferred a
+  // couple of frames so it lands after the router's own scroll reset.
   useEffect(() => {
     const key = searchParams.toString();
-    if (loading || hits.length === 0 || scrollRestored.current === key) return;
-    scrollRestored.current = key;
-    const saved = sessionStorage.getItem(`home-scroll:${key}`);
-    if (saved) window.scrollTo(0, Number(saved) || 0);
+    if (loading || hits.length === 0 || scrollHandled.current === key) return;
+    scrollHandled.current = key;
+    const y = pendingScroll.current;
+    pendingScroll.current = null;
+    if (y && y > 0) {
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => window.scrollTo(0, y)),
+      );
+    }
   }, [loading, hits, searchParams]);
 
   function setParams(
@@ -151,14 +167,14 @@ function HomeBody() {
   ) {
     const params = new URLSearchParams(searchParams.toString());
     for (const [k, v] of Object.entries(updates)) {
-      const isDefault =
-        v === null ||
-        v === "" ||
-        (k === "page" && v === "1");
+      const isDefault = v === null || v === "" || (k === "page" && v === "1");
       if (isDefault) params.delete(k);
       else params.set(k, v);
     }
     const qs = params.toString();
+    // A fresh result-set: forget the previous view's saved scroll handling.
+    scrollHandled.current = null;
+    pendingScroll.current = null;
     router.replace(qs ? `/?${qs}` : "/", { scroll: false });
     if (scrollTop) window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -198,37 +214,37 @@ function HomeBody() {
   }
 
   return (
-    <div>
-      <section className="mb-8">
-        <h1 className="font-display text-4xl font-semibold leading-tight tracking-tight sm:text-5xl">
-          India tech jobs,
-          <br />
-          <span className="text-accent">unified and matched.</span>
-        </h1>
-        <p className="mt-3 max-w-xl text-ink/60">
-          One search across multiple job boards, deduplicated and ranked by
-          semantic relevance.
-        </p>
-      </section>
+    <main className="mx-auto max-w-5xl px-6 py-12">
+      <h1 className="font-serif text-5xl font-bold leading-tight tracking-tight">
+        India tech jobs,
+        <br />
+        <span className="text-accent">unified and matched.</span>
+      </h1>
+      <p className="mt-5 max-w-xl text-lg text-ink/70">
+        One search across multiple job boards, deduplicated and ranked by
+        semantic relevance.
+      </p>
 
-      <div className="mb-5 flex flex-col gap-3 sm:flex-row">
+      <div className="mt-8 flex gap-3">
         <input
           value={qInput}
           onChange={(e) => setQInput(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && runSearch()}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") runSearch();
+          }}
           placeholder="Try: data engineer in Bangalore"
-          className="flex-1 rounded-lg border border-ink/15 bg-white/60 px-4 py-3 outline-none focus:border-accent"
+          className="flex-1 rounded-xl border border-ink/15 bg-paper px-5 py-4 text-lg outline-none focus:border-accent"
         />
         <button
           onClick={runSearch}
-          className="rounded-lg bg-ink px-6 py-3 font-medium text-paper transition hover:bg-accent"
+          className="rounded-xl bg-ink px-8 py-4 text-lg font-medium text-paper hover:opacity-90"
         >
           Search
         </button>
       </div>
 
-      <div className="mb-3 flex flex-wrap items-center gap-2 text-sm">
-        <span className="text-ink/50">Sort by:</span>
+      <div className="mt-6 flex flex-wrap items-center gap-2">
+        <span className="text-sm text-ink/50">Sort by:</span>
         {SORTS.map((s) => (
           <button
             key={s.value}
@@ -240,117 +256,132 @@ function HomeBody() {
         ))}
       </div>
 
-      <div className="mb-6 flex flex-wrap items-center gap-2 text-sm">
-        <span className="text-ink/50">Filter:</span>
-        <button
-          onClick={clearSources}
-          className={pill(selectedSources.length === 0)}
-        >
-          All
-        </button>
-        {sourceList.map((s) => (
+      {sourceList.length > 0 && (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <span className="text-sm text-ink/50">Filter:</span>
           <button
-            key={s.source}
-            onClick={() => toggleSource(s.source)}
-            className={`${pill(selectedSources.includes(s.source))} capitalize`}
+            onClick={clearSources}
+            className={pill(selectedSources.length === 0)}
           >
-            {s.source}
+            All
           </button>
-        ))}
-      </div>
-
-      {error && <p className="mb-3 text-sm text-accent">{error}</p>}
-
-      {!loading && total > 0 && (
-        <p className="mb-3 text-sm text-ink/50">
-          Showing {rangeStart.toLocaleString()}&ndash;{rangeEnd.toLocaleString()}{" "}
-          of {total.toLocaleString()} jobs
-        </p>
-      )}
-
-      {loading ? (
-        <p className="text-ink/50">Searching&hellip;</p>
-      ) : (
-        <div className="grid gap-3 sm:grid-cols-2">
-          {hits.map((job, i) => (
-            <JobCard key={job.id} job={job} position={i} />
+          {sourceList.map((s) => (
+            <button
+              key={s.source}
+              onClick={() => toggleSource(s.source)}
+              className={pill(selectedSources.includes(s.source))}
+            >
+              {s.source.charAt(0).toUpperCase() + s.source.slice(1)}
+            </button>
           ))}
         </div>
       )}
 
-      {!loading && totalPages > 1 && (
-        <div className="mt-8 flex flex-wrap items-center justify-center gap-1">
-          <PageBtn
-            label="‹ Prev"
-            disabled={pageParam <= 1}
-            onClick={() => goPage(pageParam - 1)}
-          />
-          {pageWindow(pageParam, totalPages).map((p, i) =>
-            typeof p === "string" ? (
-              <span key={`gap-${i}`} className="px-2 text-ink/40">
-                &hellip;
-              </span>
-            ) : (
-              <PageBtn
-                key={p}
-                label={String(p)}
-                active={p === pageParam}
-                onClick={() => goPage(p)}
-              />
-            ),
-          )}
-          <PageBtn
-            label="Next ›"
-            disabled={pageParam >= totalPages}
-            onClick={() => goPage(pageParam + 1)}
-          />
+      <div className="mt-8">
+        {error && <p className="text-accent">{error}</p>}
+
+        {!error && (
+          <p className="mb-4 text-sm text-ink/50">
+            {loading
+              ? "Loading\u2026"
+              : total === 0
+                ? "No jobs match your search."
+                : `Showing ${rangeStart}\u2013${rangeEnd} of ${total} jobs`}
+          </p>
+        )}
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          {hits.map((job) => (
+            <JobCard key={job.id} job={job} />
+          ))}
         </div>
-      )}
-    </div>
+
+        {totalPages > 1 && (
+          <div className="mt-10 flex flex-wrap items-center justify-center gap-2">
+            <PageBtn onClick={() => goPage(pageParam - 1)} disabled={pageParam <= 1}>
+              Prev
+            </PageBtn>
+            {pageWindow(pageParam, totalPages).map((p, i) =>
+              p === "gap" ? (
+                <span key={`g${i}`} className="px-2 text-ink/40">
+                  &hellip;
+                </span>
+              ) : (
+                <PageBtn
+                  key={p}
+                  onClick={() => goPage(p)}
+                  active={p === pageParam}
+                >
+                  {p}
+                </PageBtn>
+              ),
+            )}
+            <PageBtn
+              onClick={() => goPage(pageParam + 1)}
+              disabled={pageParam >= totalPages}
+            >
+              Next
+            </PageBtn>
+          </div>
+        )}
+      </div>
+    </main>
   );
 }
 
-function pill(active: boolean): string {
-  return `rounded-full border px-3 py-1 transition ${
+function pill(active: boolean) {
+  return [
+    "rounded-full border px-4 py-1.5 text-sm transition",
     active
       ? "border-accent bg-accent text-paper"
-      : "border-ink/15 text-ink/70 hover:border-accent"
-  }`;
+      : "border-ink/15 bg-paper text-ink/70 hover:border-ink/30",
+  ].join(" ");
 }
 
 function pageWindow(current: number, totalPages: number): (number | "gap")[] {
-  const out: (number | "gap")[] = [1];
-  const lo = Math.max(2, current - 2);
-  const hi = Math.min(totalPages - 1, current + 2);
-  if (lo > 2) out.push("gap");
-  for (let n = lo; n <= hi; n++) out.push(n);
-  if (hi < totalPages - 1) out.push("gap");
-  if (totalPages > 1) out.push(totalPages);
+  const out: (number | "gap")[] = [];
+  const push = (p: number) => out.push(p);
+  const window = 1;
+  const first = 1;
+  const last = totalPages;
+  for (let p = first; p <= last; p++) {
+    if (
+      p === first ||
+      p === last ||
+      (p >= current - window && p <= current + window)
+    ) {
+      push(p);
+    } else if (out[out.length - 1] !== "gap") {
+      out.push("gap");
+    }
+  }
   return out;
 }
 
 function PageBtn({
-  label,
-  active,
-  disabled,
+  children,
   onClick,
+  disabled,
+  active,
 }: {
-  label: string;
-  active?: boolean;
-  disabled?: boolean;
+  children: ReactNode;
   onClick: () => void;
+  disabled?: boolean;
+  active?: boolean;
 }) {
   return (
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`rounded-md border px-3 py-1 text-sm transition disabled:opacity-40 ${
+      className={[
+        "min-w-9 rounded-lg border px-3 py-1.5 text-sm transition",
         active
           ? "border-accent bg-accent text-paper"
-          : "border-ink/15 text-ink/70 hover:border-accent"
-      }`}
+          : "border-ink/15 bg-paper text-ink/70 hover:border-ink/30",
+        disabled ? "cursor-not-allowed opacity-40" : "",
+      ].join(" ")}
     >
-      {label}
+      {children}
     </button>
   );
 }

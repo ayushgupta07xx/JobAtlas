@@ -43,7 +43,7 @@ export default function JobDetailPage({
           onClick={goBack}
           className="mt-4 inline-block text-sm underline"
         >
-          ← Back to search
+          ← Back
         </button>
       </div>
     );
@@ -57,7 +57,7 @@ export default function JobDetailPage({
         onClick={goBack}
         className="text-sm text-ink/50 hover:text-accent"
       >
-        ← Back to search
+        ← Back
       </button>
       <h1 className="mt-4 font-display text-3xl font-semibold leading-tight sm:text-4xl">
         {job.title}
