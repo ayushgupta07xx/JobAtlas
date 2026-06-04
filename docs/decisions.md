@@ -160,3 +160,7 @@ The warehouse must reflect operational changes to `staging.jobs` without batch r
 **Decision:** GX lives in a dedicated `.venv-gx`, with deps in `warehouse/great_expectations/requirements.txt`, mirroring the `.venv-dbt` isolation pattern from ADR-0008. Suites are defined programmatically via the GX 1.x Fluent API (no CLI scaffold) and validated against local Postgres via a file-backed context at `warehouse/great_expectations/gx/`. The Airflow integration bakes GX into its own venv inside the `jobatlas/airflow:2.9.3` image, separate from both Airflow's env and the baked `/opt/jobatlas-venv`; the app `.venv` is never modified.
 
 **Status:** Accepted.
+
+## ADR-0013: pgvector HNSW queries set hnsw.ef_search = 400
+
+The HNSW `ef_search` GUC defaults to 40, silently capping `ORDER BY embedding <=> q LIMIT N` to ~40 rows regardless of N. This had crippled `/search` and `/match` to ~40 of 9,014 jobs and produced phantom pagination — `total` counted all matches while the pool ran dry past ~40. Every similarity query now sets `ef_search ≥ pool size` before running (`search.py`, `match.py`, `bench_match_latency.py`); call sites carry inline comments.
