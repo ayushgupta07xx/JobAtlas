@@ -164,3 +164,19 @@ The warehouse must reflect operational changes to `staging.jobs` without batch r
 ## ADR-0013: pgvector HNSW queries set hnsw.ef_search = 400
 
 The HNSW `ef_search` GUC defaults to 40, silently capping `ORDER BY embedding <=> q LIMIT N` to ~40 rows regardless of N. This had crippled `/search` and `/match` to ~40 of 9,014 jobs and produced phantom pagination — `total` counted all matches while the pool ran dry past ~40. Every similarity query now sets `ef_search ≥ pool size` before running (`search.py`, `match.py`, `bench_match_latency.py`); call sites carry inline comments.
+
+## ADR-0014: Dashboards source the staging.jobs snapshot, not the §6 BigQuery marts
+
+**Status:** Accepted
+
+**Context:** The §6 diagram routes BI tools off BigQuery marts, but those marts only ever materialized in the GCP/Snowflake demo cycles (since torn down). Neon (prod) holds only raw.jobs_raw, staging.jobs, staging.jobs_embeddings, public.alembic_version — no marts schema. BI tools have no live warehouse to read.
+
+**Decision:** Both dashboards source the staging.jobs snapshot from scripts/export_dashboard_data.py:
+- Tableau Public reads a .hyper Extract (not Live) of docs/dashboards/jobs_extract.csv.
+- Looker Studio reads a Google Sheet copy of jobs_extract, data source set to Owner's credentials.
+
+**Rejected:**
+- Live Neon PostgreSQL connector — Neon's SSL requires client certs it doesn't issue; connector can't authenticate.
+- Looker File Upload CSV connector — renders for the owner but blank/system-error for logged-out viewers.
+
+**Consequences:** Dashboards reflect the export-time snapshot, not live Neon; they go stale after the next crawl until re-exported (tracked under the Day-20 local→Neon sync deferral). Both URLs verified in incognito.
