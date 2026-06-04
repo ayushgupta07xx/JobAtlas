@@ -117,6 +117,11 @@ export function JobModal({ id }: { id: string }) {
                   {job.description}
                 </div>
               ))}
+            {job.source === "adzuna" && (
+              <p className="mt-3 text-xs italic text-ink/40">
+                Preview only — full description on the employer&apos;s site.
+              </p>
+            )}
             <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
               <a
                 href={job.source_url}
