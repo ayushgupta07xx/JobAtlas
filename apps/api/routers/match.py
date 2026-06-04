@@ -1,9 +1,16 @@
-"""Resume match endpoint: upload resume -> embed -> ranked jobs (pgvector)."""
+"""Resume match endpoint: upload resume -> embed -> ranked jobs (pgvector).
+
+Mirrors /search's relevant-pool model: the resume embedding selects a top-N
+candidate pool, then sort / source filter / pagination operate within it. The
+A/B variant drives only the relevance ordering (control = cosine, test =
+blended cosine + skill coverage).
+"""
 
 from __future__ import annotations
 
 import io
 import re
+from datetime import date
 from typing import Any
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
@@ -22,24 +29,18 @@ router = APIRouter(tags=["match"])
 # Space without the jobatlas package; keep in sync if a source flag changes.
 MATCH_EXCLUDED_SOURCES: frozenset[str] = frozenset({"remotive"})
 
-RERANK_POOL = 50
+# Candidate pool: the top-N jobs by resume similarity. Sort, source filter and
+# pagination all operate within this relevant set (mirrors /search's
+# _RELEVANT_POOL); the test-variant rerank blends over it.
+MATCH_POOL = 200
 W_COS = 0.6
 W_SKILL = 0.4
 
-_MATCH_SQL = text(
-    """
-    SELECT j.id, j.title, j.company, j.city, j.state, j.country, j.source,
-           j.source_url, j.salary_min, j.salary_max, j.currency, j.posted_date,
-           j.skills, j.scraped_at,
-           1 - (e.embedding <=> CAST(:qvec AS vector)) AS score
-    FROM staging.jobs j
-    JOIN staging.jobs_embeddings e ON e.job_id = j.id
-    WHERE j.is_active = true AND j.is_duplicate = false
-      AND j.source NOT IN :excluded
-    ORDER BY e.embedding <=> CAST(:qvec AS vector)
-    LIMIT :pool
-    """
-).bindparams(bindparam("excluded", expanding=True))
+_BASE_COLS = """
+    j.id, j.title, j.company, j.city, j.state, j.country, j.source,
+    j.source_url, j.salary_min, j.salary_max, j.currency, j.posted_date,
+    j.skills, j.scraped_at
+"""
 
 
 def _extract_text(file: UploadFile, raw: bytes) -> str:
@@ -74,7 +75,7 @@ def _resume_skills(resume_text: str, vocab: set[str]) -> set[str]:
     return found
 
 
-def _rerank(rows: list[dict[str, Any]], resume_text: str, limit: int) -> list[dict[str, Any]]:
+def _rerank(rows: list[dict[str, Any]], resume_text: str) -> list[dict[str, Any]]:
     per_job: dict[Any, set[str]] = {}
     vocab: set[str] = set()
     for r in rows:
@@ -89,7 +90,17 @@ def _rerank(rows: list[dict[str, Any]], resume_text: str, limit: int) -> list[di
         coverage = len(sk & rskills) / len(sk) if sk else 0.0
         return W_COS * cos + W_SKILL * coverage
 
-    return sorted(rows, key=blended, reverse=True)[:limit]
+    return sorted(rows, key=blended, reverse=True)
+
+
+def _by_salary(r: dict[str, Any]) -> float:
+    val = r.get("salary_max") or r.get("salary_min")
+    return float(val) if val is not None else -1.0
+
+
+def _by_recency(r: dict[str, Any]) -> tuple[int, date]:
+    pd = r.get("posted_date")
+    return (1, pd) if isinstance(pd, date) else (0, date.min)
 
 
 @router.post("/match", response_model=SearchResponse)
@@ -97,6 +108,9 @@ def match(
     db: Session = Depends(get_session),
     file: UploadFile = File(...),
     limit: int = Query(default=settings.search_default_limit, ge=1, le=settings.search_max_limit),
+    offset: int = Query(default=0, ge=0),
+    sort: str = Query(default="relevance", pattern="^(relevance|salary|recency)$"),
+    source: str | None = Query(default=None, description="Comma-separated source filter"),
     variant: str = Query(default="control"),
 ) -> SearchResponse:
     raw = file.file.read()
@@ -105,16 +119,51 @@ def match(
         raise HTTPException(status_code=422, detail="Could not extract resume text")
     vec = embed_text(resume_text)
     qvec = "[" + ",".join(f"{x:.6f}" for x in vec) + "]"
-    pool = max(limit, RERANK_POOL) if variant == "test" else limit
-    rows: list[dict[str, Any]] = [
-        dict(r)
-        for r in db.execute(
-            _MATCH_SQL,
-            {"qvec": qvec, "pool": pool, "excluded": list(MATCH_EXCLUDED_SOURCES)},
-        )
-        .mappings()
-        .all()
+
+    filters = [
+        "j.is_active = true",
+        "j.is_duplicate = false",
+        "j.source NOT IN :excluded",
     ]
-    ranked = _rerank(rows, resume_text, limit) if variant == "test" else rows[:limit]
-    hits = [SearchHit(**row) for row in ranked]
-    return SearchResponse(count=len(hits), query="resume", results=hits)
+    params: dict[str, Any] = {
+        "qvec": qvec,
+        "pool": MATCH_POOL,
+        "excluded": list(MATCH_EXCLUDED_SOURCES),
+    }
+    if source:
+        srcs = [s.strip() for s in source.split(",") if s.strip()]
+        if srcs:
+            placeholders = ", ".join(f":src{i}" for i in range(len(srcs)))
+            filters.append(f"j.source IN ({placeholders})")
+            for i, s in enumerate(srcs):
+                params[f"src{i}"] = s
+    if sort == "salary":
+        filters.append("(j.salary_min IS NOT NULL OR j.salary_max IS NOT NULL)")
+    where = " AND ".join(filters)
+
+    pool_sql = text(
+        f"""
+        SELECT {_BASE_COLS},
+               1 - (e.embedding <=> CAST(:qvec AS vector)) AS score
+        FROM staging.jobs j
+        JOIN staging.jobs_embeddings e ON e.job_id = j.id
+        WHERE {where}
+        ORDER BY e.embedding <=> CAST(:qvec AS vector)
+        LIMIT :pool
+        """
+    ).bindparams(bindparam("excluded", expanding=True))
+    rows: list[dict[str, Any]] = [dict(r) for r in db.execute(pool_sql, params).mappings().all()]
+
+    if sort == "salary":
+        ranked = sorted(rows, key=_by_salary, reverse=True)
+    elif sort == "recency":
+        ranked = sorted(rows, key=_by_recency, reverse=True)
+    elif variant == "test":
+        ranked = _rerank(rows, resume_text)
+    else:
+        ranked = rows  # control: pure cosine order (pool already sorted)
+
+    total = len(rows)
+    page = ranked[offset : offset + limit]
+    hits = [SearchHit(**row) for row in page]
+    return SearchResponse(count=len(hits), total=total, query="resume", results=hits)
