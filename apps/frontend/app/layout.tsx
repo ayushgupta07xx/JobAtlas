@@ -9,7 +9,6 @@ const display = Fraunces({
   variable: "--font-display",
   weight: ["400", "500", "600", "700"],
 });
-
 const body = Hanken_Grotesk({
   subsets: ["latin"],
   variable: "--font-body",
@@ -23,18 +22,21 @@ export const metadata: Metadata = {
 
 export default function RootLayout({
   children,
+  modal,
 }: {
   children: React.ReactNode;
+  modal: React.ReactNode;
 }) {
   return (
     <html lang="en" className={`${display.variable} ${body.variable}`}>
       <body className="min-h-screen bg-paper text-ink antialiased">
         <PostHogProvider>
-        <Nav />
-        <main className="mx-auto max-w-5xl px-5 py-8">{children}</main>
-        <footer className="mx-auto max-w-5xl px-5 py-10 text-xs text-ink/40">
-          JobAtlas · unified India tech job search
-        </footer>
+          <Nav />
+          <main className="mx-auto max-w-5xl px-5 py-8">{children}</main>
+          {modal}
+          <footer className="mx-auto max-w-5xl px-5 py-10 text-xs text-ink/40">
+            JobAtlas · unified India tech job search
+          </footer>
         </PostHogProvider>
       </body>
     </html>

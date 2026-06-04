@@ -16,13 +16,13 @@ const PAGE_SIZE = 24;
 
 const SORTS = [
   { value: "relevance", label: "Relevance" },
-  { value: "salary", label: "Salary \u00b7 High to Low" },
+  { value: "salary", label: "Salary · High to Low" },
   { value: "recency", label: "Recency" },
 ];
 
 export default function HomePage() {
   return (
-    <Suspense fallback={<p className="px-6 py-10 text-ink/50">{"Loading\u2026"}</p>}>
+    <Suspense fallback={<p className="text-ink/50">Loading…</p>}>
       <HomeBody />
     </Suspense>
   );
@@ -51,8 +51,6 @@ function HomeBody() {
   const [error, setError] = useState<string | null>(null);
 
   const pendingTrigger = useRef<"query" | "filter" | null>(null);
-  const pendingScroll = useRef<number | null>(null);
-  const scrollHandled = useRef<string | null>(null);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const rangeStart = total === 0 ? 0 : (pageParam - 1) * PAGE_SIZE + 1;
@@ -70,16 +68,7 @@ function HomeBody() {
       .catch(() => setSourceList([]));
   }, []);
 
-  // Capture the saved scroll for this view on entry, before the scroll
-  // listener (or the router's reset) can overwrite it.
-  useEffect(() => {
-    const key = searchParams.toString();
-    if (scrollHandled.current === key) return;
-    const saved = sessionStorage.getItem(`home-scroll:${key}`);
-    pendingScroll.current = saved !== null ? Number(saved) || 0 : null;
-  }, [searchParams]);
-
-  // Fetch whenever committed params change (search / filter / sort / page / back).
+  // Fetch whenever committed params change (search / filter / sort / page).
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
@@ -127,40 +116,6 @@ function HomeBody() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [qParam, sourceParam, sortParam, pageParam]);
 
-  // Persist scroll position per result-set as the user scrolls.
-  useEffect(() => {
-    const key = `home-scroll:${searchParams.toString()}`;
-    let ticking = false;
-    const save = () => {
-      if (ticking) return;
-      ticking = true;
-      requestAnimationFrame(() => {
-        sessionStorage.setItem(key, String(window.scrollY));
-        ticking = false;
-      });
-    };
-    window.addEventListener("scroll", save, { passive: true });
-    return () => {
-      sessionStorage.setItem(key, String(window.scrollY));
-      window.removeEventListener("scroll", save);
-    };
-  }, [searchParams]);
-
-  // Once the result-set has rendered, jump to the captured scroll, deferred a
-  // couple of frames so it lands after the router's own scroll reset.
-  useEffect(() => {
-    const key = searchParams.toString();
-    if (loading || hits.length === 0 || scrollHandled.current === key) return;
-    scrollHandled.current = key;
-    const y = pendingScroll.current;
-    pendingScroll.current = null;
-    if (y && y > 0) {
-      requestAnimationFrame(() =>
-        requestAnimationFrame(() => window.scrollTo(0, y)),
-      );
-    }
-  }, [loading, hits, searchParams]);
-
   function setParams(
     updates: Record<string, string | null>,
     scrollTop = false,
@@ -172,9 +127,6 @@ function HomeBody() {
       else params.set(k, v);
     }
     const qs = params.toString();
-    // A fresh result-set: forget the previous view's saved scroll handling.
-    scrollHandled.current = null;
-    pendingScroll.current = null;
     router.replace(qs ? `/?${qs}` : "/", { scroll: false });
     if (scrollTop) window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -214,7 +166,7 @@ function HomeBody() {
   }
 
   return (
-    <main className="mx-auto max-w-5xl px-6 py-12">
+    <>
       <h1 className="font-serif text-5xl font-bold leading-tight tracking-tight">
         India tech jobs,
         <br />
@@ -283,10 +235,10 @@ function HomeBody() {
         {!error && (
           <p className="mb-4 text-sm text-ink/50">
             {loading
-              ? "Loading\u2026"
+              ? "Loading…"
               : total === 0
                 ? "No jobs match your search."
-                : `Showing ${rangeStart}\u2013${rangeEnd} of ${total} jobs`}
+                : `Showing ${rangeStart}–${rangeEnd} of ${total} jobs`}
           </p>
         )}
 
@@ -325,7 +277,7 @@ function HomeBody() {
           </div>
         )}
       </div>
-    </main>
+    </>
   );
 }
 
@@ -340,7 +292,6 @@ function pill(active: boolean) {
 
 function pageWindow(current: number, totalPages: number): (number | "gap")[] {
   const out: (number | "gap")[] = [];
-  const push = (p: number) => out.push(p);
   const window = 1;
   const first = 1;
   const last = totalPages;
@@ -350,7 +301,7 @@ function pageWindow(current: number, totalPages: number): (number | "gap")[] {
       p === last ||
       (p >= current - window && p <= current + window)
     ) {
-      push(p);
+      out.push(p);
     } else if (out[out.length - 1] !== "gap") {
       out.push("gap");
     }
