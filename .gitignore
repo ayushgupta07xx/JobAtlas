@@ -114,3 +114,4 @@ warehouse/dbt_project/seeds/*.csv
 warehouse/great_expectations/gx/
 .venv-gx/
 *:Zone.Identifier
+docs/dashboards/*.csv
