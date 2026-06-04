@@ -43,7 +43,11 @@ def bench(engine: Engine, pool: int, runs: int = 200) -> None:
     excluded = list(MATCH_EXCLUDED_SOURCES)
     lat: list[float] = []
     with engine.connect() as conn:
-        conn.execute(SQL, {"qvec": rand_vec(), "pool": pool, "excluded": excluded}).all()  # warm
+        # Match the live endpoint: lift the HNSW candidate ceiling so the query
+        # retrieves the full pool instead of the default ~40 rows.
+        conn.execute(text("SET hnsw.ef_search = 400"))
+        for _ in range(10):  # warm: connection, plan, index pages into cache
+            conn.execute(SQL, {"qvec": rand_vec(), "pool": pool, "excluded": excluded}).all()
         for _ in range(runs):
             params = {"qvec": rand_vec(), "pool": pool, "excluded": excluded}
             t0 = time.perf_counter()
@@ -70,8 +74,9 @@ def main() -> None:
         raise SystemExit("DATABASE_URL not set (load_dotenv reads the repo .env).")
     engine = create_engine(url)
     print(f"DB host: {make_url(url).host}  (use local Docker Postgres for this claim)")
-    bench(engine, pool=12)  # control
-    bench(engine, pool=50)  # test (larger rerank pool)
+    # Both arms share one 200-candidate pool (MATCH_POOL); control orders it by
+    # cosine, test reranks it in Python. This times the shared pgvector fetch.
+    bench(engine, pool=200)
 
 
 if __name__ == "__main__":

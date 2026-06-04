@@ -22,9 +22,13 @@ job's skill set the résumé actually covers.
 
 ## Variants
 
-**control** — pure cosine. Top `limit` jobs ordered by `1 - (embedding <=> resume_vector)`.
+Both arms draw from the same candidate pool — the top **200** jobs by cosine
+distance (`MATCH_POOL`), retrieved with `hnsw.ef_search = 400` so the HNSW index
+returns the full pool rather than its ~40-row default.
 
-**test** — skill-weighted reranking. Fetch the top 50 cosine candidates, then reorder by:
+**control** — pure cosine. The 200-job pool ordered by `1 - (embedding <=> resume_vector)`.
+
+**test** — skill-weighted reranking. The same 200-job pool reordered by:
 
 ```
 blended  = 0.6 * cosine + 0.4 * coverage
@@ -43,7 +47,7 @@ threshold (`apply_clicked` where `match_score ≥ 0.7`).
 
 ## Hypothesis
 
-Reranking the top-50 cosine candidates by weighted skill overlap increases
+Reranking the top-200 cosine candidates by weighted skill overlap increases
 apply-clicks by ≥5%. (Observed: +10.3%.)
 
 ## Metrics
@@ -75,9 +79,9 @@ apply-clicks by ≥5%. (Observed: +10.3%.)
 significant → flat, no regression.
 
 **Latency guardrail:** the pgvector query was benchmarked separately
-(`scripts/bench_match_latency.py`, local Postgres, 200 runs): **p95 ≈ 1.1 ms**
-for the control pool (12) and **≈ 0.9 ms** for the larger test pool (50) — roughly
-90× under the 100 ms target. The reranking adds only Python-side sorting over 50
+(`scripts/bench_match_latency.py`, local Postgres, 200 runs, `hnsw.ef_search = 400`):
+**p95 ≈ 6.0 ms** for the shared 200-job pool (p50 ≈ 4.1 ms, p99 ≈ 7.1 ms) — roughly
+17× under the 100 ms target. The reranking adds only Python-side sorting over 200
 rows, so the latency guardrail is comfortably flat.
 
 ## Decision
