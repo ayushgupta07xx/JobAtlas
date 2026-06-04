@@ -113,3 +113,4 @@ warehouse/dbt_project/seeds/*.csv
 # Great Expectations runtime output (validation results + data docs)
 warehouse/great_expectations/gx/
 .venv-gx/
+*:Zone.Identifier
