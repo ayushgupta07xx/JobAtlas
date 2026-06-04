@@ -117,20 +117,30 @@ export function JobModal({ id }: { id: string }) {
                   {job.description}
                 </div>
               ))}
-            <a
-              href={job.source_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() =>
-                track(EVENTS.APPLY_CLICKED, {
-                  job_id: job.id,
-                  source: job.source,
-                })
-              }
-              className="mt-8 inline-block rounded-lg bg-ink px-6 py-3 font-medium text-paper transition hover:bg-accent"
-            >
-              Apply on {job.source} →
-            </a>
+            <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
+              <a
+                href={job.source_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() =>
+                  track(EVENTS.APPLY_CLICKED, {
+                    job_id: job.id,
+                    source: job.source,
+                  })
+                }
+                className="inline-block rounded-lg bg-ink px-6 py-3 font-medium text-paper transition hover:bg-accent"
+              >
+                Apply on {job.source} →
+              </a>
+              <a
+                href={`/jobs/${job.id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-ink/50 underline-offset-2 transition hover:text-accent hover:underline"
+              >
+                Open in new tab ↗
+              </a>
+            </div>
           </article>
         )}
       </div>
