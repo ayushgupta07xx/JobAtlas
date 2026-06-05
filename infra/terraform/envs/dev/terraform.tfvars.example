@@ -1,0 +1,4 @@
+project_id      = "jobatlas-496822"
+region          = "asia-south1"
+gcs_bucket_name = "jobatlas-496822-archive"
+enable_cloudsql = true
