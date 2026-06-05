@@ -41,7 +41,7 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
-      - run: pip install dbt-postgres
+      - run: pip install "dbt-postgres>=1.7,<2.0"
       - name: Write CI dbt profile
         run: |
           PROFILE=$(grep -E '^profile:' warehouse/dbt_project/dbt_project.yml | head -1 | sed -E "s/^profile:[[:space:]]*//; s/[\"']//g")
@@ -64,7 +64,7 @@ jobs:
         working-directory: warehouse/dbt_project
         run: |
           dbt deps
-          dbt docs generate --target ci
+          dbt docs generate --profiles-dir "$HOME/.dbt" --target ci
       - name: Stage site
         run: |
           mkdir -p site

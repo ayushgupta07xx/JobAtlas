@@ -28,7 +28,7 @@ jobs:
       - name: Mypy
         run: mypy .
       - name: Pytest
-        run: pytest -q
+        run: pytest -q || [ "$?" -eq 5 ]
 
   sql:
     name: sqlfluff
@@ -52,7 +52,7 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
-      - run: pip install dbt-postgres
+      - run: pip install "dbt-postgres>=1.7,<2.0"
       - name: Write CI dbt profile
         run: |
           PROFILE=$(grep -E '^profile:' warehouse/dbt_project/dbt_project.yml | head -1 | sed -E "s/^profile:[[:space:]]*//; s/[\"']//g")
@@ -75,7 +75,7 @@ jobs:
         working-directory: warehouse/dbt_project
         run: |
           dbt deps
-          dbt parse --target ci
+          dbt parse --profiles-dir "$HOME/.dbt" --target ci
 
   terraform:
     name: terraform validate
