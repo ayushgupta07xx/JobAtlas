@@ -52,7 +52,7 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
-      - run: pip install -e ".[dev]"
+      - run: pip install dbt-postgres
       - name: Write CI dbt profile
         run: |
           PROFILE=$(grep -E '^profile:' warehouse/dbt_project/dbt_project.yml | head -1 | sed -E "s/^profile:[[:space:]]*//; s/[\"']//g")
@@ -99,7 +99,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Trivy filesystem scan
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@master
         with:
           scan-type: fs
           scan-ref: .

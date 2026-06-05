@@ -41,7 +41,7 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
-      - run: pip install -e ".[dev]"
+      - run: pip install dbt-postgres
       - name: Write CI dbt profile
         run: |
           PROFILE=$(grep -E '^profile:' warehouse/dbt_project/dbt_project.yml | head -1 | sed -E "s/^profile:[[:space:]]*//; s/[\"']//g")
