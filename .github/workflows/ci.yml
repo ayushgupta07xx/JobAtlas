@@ -46,60 +46,32 @@ jobs:
   dbt:
     name: dbt build
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: pgvector/pgvector:pg16
-        env:
-          POSTGRES_USER: ci
-          POSTGRES_PASSWORD: ci
-          POSTGRES_DB: ci
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+    # Full build against the Snowflake trial. Skips (green) unless repo var
+    # DBT_BUILD_SNOWFLAKE=true, so it auto-skips cleanly once the trial lapses.
+    if: ${{ vars.DBT_BUILD_SNOWFLAKE == 'true' }}
     env:
-      DATABASE_URL: postgresql+psycopg://ci:ci@localhost:5432/ci
+      SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+      SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+      DBT_ENV_SECRET_SNOWFLAKE_PASS: ${{ secrets.SNOWFLAKE_PASSWORD }}
+      SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
+      SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
+      SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+      SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           cache: pip
-      - name: Install app + dbt
-        run: |
-          pip install -e ".[dev]"
-          pip install "dbt-postgres==1.9.*"
-      - name: Build schema (alembic)
-        run: alembic upgrade head
-      - name: Write CI dbt profile
-        run: |
-          PROFILE=$(grep -E '^profile:' warehouse/dbt_project/dbt_project.yml | head -1 | sed -E "s/^profile:[[:space:]]*//; s/[\"']//g")
-          mkdir -p ~/.dbt
-          {
-            echo "$PROFILE:"
-            echo "  target: ci"
-            echo "  outputs:"
-            echo "    ci:"
-            echo "      type: postgres"
-            echo "      host: localhost"
-            echo "      port: 5432"
-            echo "      user: ci"
-            echo "      password: ci"
-            echo "      dbname: ci"
-            echo "      schema: public"
-            echo "      threads: 4"
-          } > ~/.dbt/profiles.yml
-      - name: dbt build
+      - run: pip install "dbt-snowflake==1.9.*"
+      - name: dbt build (snowflake)
         working-directory: warehouse/dbt_project
         run: |
           mkdir -p seeds
+          [ -f seeds/jobs_seed.csv ] || echo 'id,raw_id,source,source_job_id,source_url,title,company,city,state,country,salary_min,salary_max,currency,posted_date,description,content_hash,is_active,is_duplicate,dedup_group_id,scraped_at,created_at,updated_at' > seeds/jobs_seed.csv
           [ -f seeds/job_skills_seed.csv ] || echo 'job_id,skill_name' > seeds/job_skills_seed.csv
-          [ -f seeds/jobs_seed.csv ] || echo 'id' > seeds/jobs_seed.csv
           dbt deps
-          dbt build --empty --profiles-dir "$HOME/.dbt" --target ci
+          dbt build --target snowflake
 
   terraform:
     name: terraform validate
