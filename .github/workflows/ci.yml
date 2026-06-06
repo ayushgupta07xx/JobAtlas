@@ -89,6 +89,12 @@ jobs:
           terraform init -backend=false
           terraform validate
 
+      - name: Init + validate (snowflake env)
+        working-directory: infra/terraform/envs/snowflake
+        run: |
+          terraform init -backend=false
+          terraform validate
+
   security:
     name: trivy
     runs-on: ubuntu-latest
