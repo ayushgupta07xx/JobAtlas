@@ -68,7 +68,7 @@ def main() -> None:
     load_dotenv()
     engine = create_engine(os.environ["DATABASE_URL"], future=True)
     session_factory = sessionmaker(bind=engine)
-    mongo = MongoClient(os.environ["MONGO_URI"])
+    mongo: MongoClient = MongoClient(os.environ["MONGO_URI"])
     mongo_db = mongo[os.environ.get("MONGO_DB", "jobatlas")]
 
     with session_factory() as session:
