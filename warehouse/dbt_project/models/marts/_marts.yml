@@ -125,3 +125,122 @@ models:
         tests: [unique, not_null]
       - name: job_count
         tests: [not_null]
+  - name: dim_experience_band
+    description: "Experience-band dimension with display order."
+    columns:
+      - name: experience_band
+        tests: [unique, not_null]
+  - name: dim_role
+    description: "Role-bucket dimension with display order."
+    columns:
+      - name: role
+        tests: [unique, not_null]
+  - name: mart_salary_by_experience
+    description: "Salary aggregates by required-experience band (currencies separate)."
+    columns:
+      - name: experience_band
+        tests: [not_null]
+      - name: job_count
+        tests: [not_null]
+  - name: mart_salary_by_city_experience
+    description: "Salary by city x experience band (currencies separate)."
+    columns:
+      - name: city
+        tests: [not_null]
+  - name: mart_salary_by_role
+    description: "Salary aggregates by role bucket (currencies separate)."
+    columns:
+      - name: role
+        tests: [not_null]
+  - name: mart_jobs_by_role
+    description: "Posting counts and salary coverage by role bucket."
+    columns:
+      - name: role
+        tests: [unique, not_null]
+      - name: job_count
+        tests: [not_null]
+  - name: mart_salary_by_role_experience
+    description: "Salary by role bucket x experience band (currencies separate)."
+    columns:
+      - name: role
+        tests: [not_null]
+  - name: mart_skill_trend
+    description: "Monthly demand per skill."
+    columns:
+      - name: skill_name
+        tests: [not_null]
+      - name: job_count
+        tests: [not_null]
+  - name: mart_skill_salary_premium
+    description: "Average INR salary for postings mentioning each skill (>=5 postings)."
+    columns:
+      - name: skill_name
+        tests: [unique, not_null]
+  - name: mart_skill_cooccurrence
+    description: "Skill-pair co-occurrence across postings (>=10 co-mentions)."
+    columns:
+      - name: skill_a
+        tests: [not_null]
+      - name: skill_b
+        tests: [not_null]
+      - name: co_count
+        tests: [not_null]
+  - name: mart_emerging_skills
+    description: "Skills rising in share: recent 30-day mentions vs prior 30-day."
+    columns:
+      - name: skill_name
+        tests: [unique, not_null]
+  - name: mart_salary_model_input
+    description: "Materialized salary-regression input: features, skill_count, salary midpoint."
+    columns:
+      - name: id
+        tests: [unique, not_null]
+  - name: mart_jobs_by_state
+    description: "Posting counts and salary coverage by state."
+    columns:
+      - name: state
+        tests: [unique, not_null]
+  - name: mart_salary_by_state
+    description: "INR salary aggregates by state."
+    columns:
+      - name: state
+        tests: [unique, not_null]
+  - name: mart_remote_vs_onsite
+    description: "Remote/worldwide vs located postings: counts and INR salary."
+    columns:
+      - name: work_mode
+        tests: [unique, not_null]
+  - name: mart_posting_trend
+    description: "Daily posting volume (active postings by posted date)."
+    columns:
+      - name: posted_date
+        tests: [unique, not_null]
+      - name: job_count
+        tests: [not_null]
+  - name: mart_job_freshness
+    description: "Posting freshness buckets by age in days."
+    columns:
+      - name: freshness_bucket
+        tests: [unique, not_null]
+  - name: mart_company_hiring_trend
+    description: "Monthly posting volume per company."
+    columns:
+      - name: company
+        tests: [not_null]
+  - name: mart_dedup_summary
+    description: "Deduplication summary by source: duplicate rows vs total."
+    columns:
+      - name: source
+        tests: [unique, not_null]
+  - name: mart_source_coverage
+    description: "Per-source coverage: active postings, salary fill rate, latest posting."
+    columns:
+      - name: source
+        tests: [unique, not_null]
+  - name: mart_role_skill_matrix
+    description: "Skill demand per role bucket: postings per (role, skill)."
+    columns:
+      - name: role
+        tests: [not_null]
+      - name: skill_name
+        tests: [not_null]

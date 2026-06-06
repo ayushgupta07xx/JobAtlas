@@ -7,3 +7,26 @@ models:
         tests: [unique, not_null]
   - name: int_job_skills
     description: "One row per (job, skill); unnested from the skills array."
+  - name: int_job_experience
+    description: "Required-experience band (years) per active job."
+    columns:
+      - name: id
+        tests: [unique, not_null]
+      - name: experience_band
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['Entry (0-2)', 'Mid (3-5)', 'Senior (6-10)', 'Lead (10+)', 'Not specified']
+  - name: int_job_role
+    description: "Coarse role bucket derived from the job title."
+    columns:
+      - name: id
+        tests: [unique, not_null]
+      - name: role
+        tests: [not_null]
+  - name: int_salary_features
+    description: "Flat per-job feature base for the salary regression (INR, salaried)."
+    columns:
+      - name: id
+        tests: [unique, not_null]
