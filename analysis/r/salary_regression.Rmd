@@ -1,0 +1,90 @@
+---
+title: "Salary Drivers in the Indian Tech Job Market"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+library(tidyverse)
+```
+
+## Data
+
+Disclosed-salary postings exported from `marts.mart_salary_model_input` — the
+subset of the index that published a structured INR salary range. Salary
+disclosure is uncommon in the Indian market, so this is a small, deliberately
+filtered slice rather than the full index. Salary is the range midpoint
+(`salary_mid`), expressed in lakhs per annum (LPA).
+
+```{r load}
+df <- read_csv("../data/salary_model_input.csv") %>%
+  mutate(salary_lpa = as.numeric(salary_mid) / 1e5)
+
+nrow(df)
+glimpse(df)
+```
+
+## Canonical metro
+
+Adzuna stores the most-specific locality in `city` (e.g. "Richmond Town"), so
+fold the known metros together — the same mapping the live salary explorer uses,
+so the two artifacts agree. Everything that doesn't match a known metro becomes
+`Other`.
+
+```{r metro}
+to_metro <- function(city) {
+  c <- str_to_lower(replace_na(city, ""))
+  case_when(
+    str_detect(c, "bangalore|bengaluru") ~ "Bangalore",
+    str_detect(c, "mumbai")              ~ "Mumbai",
+    str_detect(c, "delhi")               ~ "Delhi",
+    str_detect(c, "gurgaon|gurugram")    ~ "Gurugram",
+    str_detect(c, "noida")               ~ "Noida",
+    str_detect(c, "pune")                ~ "Pune",
+    str_detect(c, "hyderabad")           ~ "Hyderabad",
+    str_detect(c, "chennai")             ~ "Chennai",
+    str_detect(c, "kolkata")             ~ "Kolkata",
+    str_detect(c, "ahmedabad")           ~ "Ahmedabad",
+    TRUE                                 ~ "Other"
+  )
+}
+
+df <- df %>%
+  mutate(
+    city_metro      = to_metro(city),
+    experience_band = replace_na(experience_band, "Not specified"),
+    role            = replace_na(role, "Other")
+  )
+
+count(df, city_metro, sort = TRUE)
+```
+
+## Regression
+
+Model salary (LPA) as a function of metro, role, experience band, and skill
+breadth.
+
+```{r model}
+fit <- lm(
+  salary_lpa ~ city_metro + role + experience_band + skill_count,
+  data = df
+)
+summary(fit)
+```
+
+## Metro salary premiums (vs. baseline metro)
+
+Positive coefficients read as the average LPA premium over the baseline metro,
+holding role, experience, and skill breadth fixed.
+
+```{r premiums}
+co <- summary(fit)$coefficients
+co[grepl("city_metro", rownames(co)), , drop = FALSE]
+```
+
+## Notes
+
+This is a descriptive model over the current index snapshot of a pre-launch
+product; coefficients describe disclosed-salary postings, not the full market.
+A scikit-learn counterpart (with K-means skill clustering) lives at
+`analysis/python/salary_regression.ipynb`.
