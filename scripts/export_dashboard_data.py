@@ -40,6 +40,15 @@ SEN = """case
   else '3 Mid'
 end"""
 
+EXP_BAND = """case
+  when experience_min is null then 'Not specified'
+  when experience_min <= 2 then 'Entry (0-2)'
+  when experience_min <= 5 then 'Mid (3-5)'
+  when experience_min <= 10 then 'Senior (6-10)'
+  else 'Lead (10+)'
+end"""
+
+
 JOBS_Q = f"""
 select
   title,
@@ -49,6 +58,8 @@ select
   salary_min, salary_max,
   case when salary_min is not null and salary_max is not null
     then round((salary_min + salary_max) / 2.0, 0) end as salary_mid,
+  experience_min, experience_max,
+  {EXP_BAND} as experience_band,
   currency, posted_date, scraped_at
 from staging.jobs
 where is_active = true and is_duplicate = false
