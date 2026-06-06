@@ -24,7 +24,7 @@ Type a query and JobAtlas returns deduplicated, salary-normalized, freshness-ran
 
 ## By the numbers
 
-- **9,000+** active, deduplicated India tech postings, refreshed daily
+- **9,000+** active, deduplicated India tech postings across 8 sources
 - **41** dbt models on a star-schema warehouse materialized to **both BigQuery and Snowflake**, with **SCD Type 2** on the job dimension
 - Semantic resume → job matching with **~6 ms p95** vector retrieval (200-candidate pool, pgvector HNSW)
 - Required-experience parsed from posting text to drive salary-by-experience analysis
