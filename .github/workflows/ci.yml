@@ -71,7 +71,7 @@ jobs:
           [ -f seeds/jobs_seed.csv ] || echo 'id,raw_id,source,source_job_id,source_url,title,company,city,state,country,salary_min,salary_max,currency,posted_date,description,content_hash,is_active,is_duplicate,dedup_group_id,scraped_at,created_at,updated_at' > seeds/jobs_seed.csv
           [ -f seeds/job_skills_seed.csv ] || echo 'job_id,skill_name' > seeds/job_skills_seed.csv
           dbt deps
-          dbt build --target snowflake
+          dbt build --target snowflake --full-refresh
 
   terraform:
     name: terraform validate
