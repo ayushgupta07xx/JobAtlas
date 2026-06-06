@@ -93,11 +93,52 @@ boot, migrating the full deduplicated index to Neon, and backfilling embeddings
 there so résumé matching covers the whole index. Managed-cloud warehouse work is
 provisioned with Terraform, demonstrated, and destroyed.
 
-## Known limitations / next
+## Retrieval recall: tuning the HNSW candidate window
 
-- The production index refresh is currently manual; a repeatable local → Neon
-  sync is the next step.
-- Neon's free tier auto-suspends, so the first request after an idle period can
-  lag once.
-- Résumé matching needs a re-upload after a full page refresh (no persisted
-  file).
+**Problem.** The relevance pool is the top ~200 by cosine similarity, yet matching sometimes skipped obviously-relevant postings that were in the index.
+
+**Cause.** `hnsw.ef_search` defaults to 40 — below the 200-candidate pool — so the index explored too few neighbours and the pool was truncated before ranking ran.
+
+**Approach.** Set `hnsw.ef_search = 400` before each similarity query in the search and match paths, comfortably above the pool size.
+
+**Trade-off.** A wider search window costs slightly more per query; at the 200-pool it stays ~6 ms p95 on local Postgres, so the recall fix is effectively free at this scale. (ADR-0013.)
+
+## Deduplication: signature over `title + company + city`, not full text
+
+**Problem.** The same role recurs across feeds and within one feed; an early full-text MinHash over-merged distinct postings that merely shared aggregator boilerplate.
+
+**Approach.** Compute the MinHash signature over `title + company + city` only, with a Jaccard threshold, so near-duplicates collapse on the fields that actually identify a posting.
+
+**Result / trade-off.** ~1,409 of 10,423 (13.5%) collapse as duplicates, leaving ~9,000 canonical. The narrower signature can under-merge genuine dupes with reformatted titles — accepted, because full-text over-merging silently dropped real jobs. (ADR-0007.)
+
+## Salary explorer: one currency, real cities
+
+**Problem.** The salary endpoint mixed INR and USD postings on one axis and surfaced raw aggregator localities ("Richmond Town", "Mini Sectt.") as if they were cities, so the chart was noise.
+
+**Approach.** Filter to INR only and fold localities into canonical metros by substring match, with a minimum-postings floor per metro.
+
+**Result / trade-off.** Nine legible metros (Delhi → Gurugram). Localities that don't name a known metro fall to "Other" or drop below the floor — accepted, because a chart a reader can trust beats one listing every neighbourhood.
+
+## The disclosed-salary reality (a planned analysis, rescoped)
+
+**Problem.** The plan assumed salary modelling over a large slice of the index. In practice Indian tech postings rarely publish a structured salary — only ~670 of 9,000+ carried an INR range.
+
+**Approach.** Scope the regression and K-means clustering to that disclosed-salary subset rather than inflate it — folding USD remote roles in, for instance, would contaminate an India-salary model with a different population.
+
+**Result / trade-off.** A small, honest n. The model is descriptive, not predictive (experience dominates; city and role aren't significant in this slice), and salary opacity becomes a finding in its own right. Better a defensible ~670 than a misleading large number.
+
+## Ingestion: official feeds and ATS over bot walls
+
+**Problem.** The original source list leaned on scraping Naukri, Wellfound, Hirist, Instahyre, Indeed — all of which gate automated access.
+
+**Approach.** Build one Scrapy spider per source, but draw real volume from official APIs and open ATS feeds (Adzuna, The Muse, Jobicy, Greenhouse/Lever/Ashby, RemoteOK, Remotive). The Naukri/Wellfound spiders exist but are best-effort: when a wall appears they fall back to APIs rather than escalating to proxies, stealth, or CAPTCHA-solving.
+
+**Result / trade-off.** Eight working sources, one aggregator ~80% of the index. The cost is an aggregator-heavy index and fewer India-native boards — accepted, because the alternative breaches both the platforms' terms and this project's own rule. Coverage grows by adding feeds, never by defeating protection.
+
+## Multi-warehouse without forking the models
+
+**Problem.** The same dbt models had to materialise into both Postgres (live source) and Snowflake (trial), but array handling and date functions differ, and the embedding table exists only in Postgres.
+
+**Approach.** Dialect-gate the models: Postgres reads live sources with native `unnest`; Snowflake reads pre-exported CSV seeds with Snowflake date functions; `stg_jobs_embeddings` is disabled off-Postgres.
+
+**Trade-off.** Two read paths to maintain — accepted as the price of a genuine multi-warehouse demonstration rather than a single-engine project wearing two labels.

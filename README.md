@@ -61,7 +61,7 @@ flowchart TB
   BQ --> BI[Tableau · Looker Studio]
 ```
 
-Raw payloads land in MongoDB, the normalizer writes a typed `staging.jobs` in Postgres, dbt builds a layered star schema into BigQuery and Snowflake in parallel, and resume matching runs against a pgvector HNSW index of `BGE-small-en-v1.5` embeddings. Change data capture streams through Debezium → Kafka; orchestration is Airflow. Full diagram and rationale in [`docs/architecture.md`](docs/architecture.md) and [`docs/decisions.md`](docs/decisions.md).
+Raw payloads land in MongoDB, the normalizer writes a typed `staging.jobs` in Postgres, dbt builds a layered star schema into BigQuery and Snowflake in parallel, and resume matching runs against a pgvector HNSW index of `BGE-small-en-v1.5` embeddings. Change data capture streams through Debezium → Kafka; orchestration is Airflow. Full diagram and rationale in [`docs/architecture.md`](docs/architecture.md) and [`docs/decisions.md`](docs/decisions.md). The design decisions, trade-offs, and where the build diverged from the plan are documented in [`docs/engineering-notes.md`](docs/engineering-notes.md).
 
 ## Tech stack
 
