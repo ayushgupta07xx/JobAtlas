@@ -74,6 +74,9 @@ jobs:
       - name: dbt deps + parse
         working-directory: warehouse/dbt_project
         run: |
+          mkdir -p seeds
+          [ -f seeds/job_skills_seed.csv ] || echo 'job_id,skill_name' > seeds/job_skills_seed.csv
+          [ -f seeds/jobs_seed.csv ] || echo 'id' > seeds/jobs_seed.csv
           dbt deps
           dbt parse --profiles-dir "$HOME/.dbt" --target ci
 

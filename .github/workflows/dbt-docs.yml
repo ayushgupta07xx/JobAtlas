@@ -63,6 +63,9 @@ jobs:
       - name: Generate docs
         working-directory: warehouse/dbt_project
         run: |
+          mkdir -p seeds
+          [ -f seeds/job_skills_seed.csv ] || echo 'job_id,skill_name' > seeds/job_skills_seed.csv
+          [ -f seeds/jobs_seed.csv ] || echo 'id' > seeds/jobs_seed.csv
           dbt deps
           dbt docs generate --profiles-dir "$HOME/.dbt" --target ci
       - name: Stage site
