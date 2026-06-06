@@ -200,6 +200,47 @@ def salary_from_description(desc: str | None) -> tuple[float | None, float | Non
     return (min(vals), max(vals)) if len(vals) > 1 else (vals[0], vals[0])
 
 
+# --- experience from free-text descriptions --------------------------------
+# Best-effort required-experience range (years) from a description. No source
+# (Adzuna included) exposes a structured experience field, so it is regex-read
+# from the body, with the year figure required ADJACENT to the word "experience"
+# (<=25 chars, no sentence break) to suppress noun-phrase hits like "customer
+# experience" or "Experience Design". Bounded 0-40 yrs; (None, None) if absent.
+# Powers the salary-by-city/role/experience dashboard dimension; unmatched rows
+# surface as an explicit "Not specified" band.
+_EXP_BEFORE = re.compile(
+    r"(\d{1,2})\s*(?:\+|\s*(?:-|to|–|—)\s*(\d{1,2}))?\s*\+?\s*"
+    r"(?:years?|yrs?)[^.]{0,25}?experience",
+    re.I,
+)
+_EXP_AFTER = re.compile(
+    r"experience[^.]{0,25}?(\d{1,2})\s*(?:\+|\s*(?:-|to|–|—)\s*(\d{1,2}))?\s*\+?\s*"
+    r"(?:years?|yrs?)",
+    re.I,
+)
+_EXP_LO, _EXP_HI = 0, 40
+
+
+def experience_from_description(desc: str | None) -> tuple[int | None, int | None]:
+    """Best-effort (min_years, max_years) of required experience; (None, None) if absent."""
+    if not desc:
+        return None, None
+    mins: list[int] = []
+    maxes: list[int] = []
+    for rx in (_EXP_BEFORE, _EXP_AFTER):
+        for m in rx.finditer(desc):
+            lo = int(m.group(1))
+            hi = int(m.group(2)) if m.group(2) else lo
+            if hi < lo:
+                lo, hi = hi, lo
+            if _EXP_LO <= lo <= _EXP_HI and _EXP_LO <= hi <= _EXP_HI:
+                mins.append(lo)
+                maxes.append(hi)
+    if not mins:
+        return None, None
+    return min(mins), max(maxes)
+
+
 # jobGeo -> ISO-3166 alpha-2 (best-effort; "ZZ" = unknown/worldwide).
 _GEO = {
     "usa": "US",

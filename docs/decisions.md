@@ -180,3 +180,31 @@ The HNSW `ef_search` GUC defaults to 40, silently capping `ORDER BY embedding <=
 - Looker File Upload CSV connector — renders for the owner but blank/system-error for logged-out viewers.
 
 **Consequences:** Dashboards reflect the export-time snapshot, not live Neon; they go stale after the next crawl until re-exported (tracked under the Day-20 local→Neon sync deferral). Both URLs verified in incognito.
+
+## ADR-0015: CI validates Terraform instead of running `terraform plan`
+
+**Status:** Accepted · **Date:** 2026-06-06
+
+**Context:** §8 called for `terraform plan` in CI. A real plan authenticates against the live provider (GCP, Snowflake), requiring long-lived credentials in Actions — a GCP service-account key or Workload Identity Federation, plus Snowflake creds. The cloud footprint here is a one-time, short-cycle demo (apply → screenshot → destroy), not standing infrastructure, so persisting deploy credentials in CI adds attack surface with no operational payoff.
+
+**Decision:** The CI `terraform` job runs `terraform fmt -check -recursive` and `terraform validate` only — both credential-free (`validate` uses `-backend=false` and never contacts the provider API). Plans/applies happen locally during the demo window with environment-sourced credentials, then torn down. CI stays fully green without storing any cloud secret.
+
+**Rejected alternatives:**
+- GCP SA-key or WIF in CI for a real plan — long-lived deploy creds for throwaway infra; rejected on security grounds.
+- Snowflake creds in CI for a plan — same; warehouse/database modules are demo-cycle only.
+
+**Consequences:** CI catches syntax, schema, and formatting errors but not provider-side plan diffs — acceptable since apply/destroy is performed and screenshotted manually per cycle.
+
+## ADR-0016: Required-experience extracted from description text (regex, best-effort)
+
+**Status:** Accepted
+
+**Context:** The salary-by-city/role/experience dashboard dimension needs a per-job experience figure, but no ingested source exposes one as structured data — Adzuna (~80% of the index), Jobicy, The Muse, and the ATS feeds (Greenhouse/Lever/Ashby) carry experience only inside free-text descriptions, if at all. `staging.jobs` had no experience column, blocking the dimension.
+
+**Decision:** Added nullable `experience_min`/`experience_max` (SMALLINT, years) to `staging.jobs` and regex-extract them in the normalizer (`experience_from_description`, `apps/normalizer/parsers.py`). The year figure must sit adjacent (≤25 chars, no sentence break) to the word "experience", anchoring on the canonical "X years of experience" / "experience: X years" requirement phrasing. Bounded 0–40 years; range forms populate both bounds, single/"+" forms set both equal. Existing rows backfilled via `scripts/backfill_experience.py` using the same function.
+
+**Alternatives rejected:**
+- Bare proximity (year token within 60 chars of "experience"): 31.3% match but noisy — matched noun-phrases like "customer experience", "Experience Design", "media experience". Validated against all 10,423 rows and rejected on precision.
+- LLM extraction: rejected on cost, latency, and non-determinism for a field a tight regex resolves with near-zero false positives.
+
+**Consequences:** Experience populated on ~29% of jobs (3,065/10,423); the rest stay NULL and surface as a "Not specified" band in the dashboard, never a fabricated figure. Recall is deliberately traded for precision so the dimension and the salary regression never ingest a bad value. Re-evaluate if a source begins returning structured experience.

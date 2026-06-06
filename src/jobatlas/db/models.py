@@ -12,6 +12,7 @@ from sqlalchemy import (
     Identity,
     Index,
     Numeric,
+    SmallInteger,
     String,
     Text,
     UniqueConstraint,
@@ -79,6 +80,8 @@ class Job(Base):
     salary_min: Mapped[float | None] = mapped_column(Numeric(12, 2))
     salary_max: Mapped[float | None] = mapped_column(Numeric(12, 2))
     currency: Mapped[str] = mapped_column(String(3), nullable=False, server_default=text("'INR'"))
+    experience_min: Mapped[int | None] = mapped_column(SmallInteger)
+    experience_max: Mapped[int | None] = mapped_column(SmallInteger)
     posted_date: Mapped[date | None] = mapped_column(Date)
     description: Mapped[str | None] = mapped_column(Text)
     skills: Mapped[list[str] | None] = mapped_column(ARRAY(Text))

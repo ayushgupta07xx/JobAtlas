@@ -18,7 +18,11 @@ from sqlalchemy import create_engine, func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import sessionmaker
 
-from apps.normalizer.parsers import PARSERS, salary_from_description
+from apps.normalizer.parsers import (
+    PARSERS,
+    experience_from_description,
+    salary_from_description,
+)
 from jobatlas.db.models import Job, JobRaw
 from jobatlas.urls import canonicalize_url
 
@@ -37,6 +41,8 @@ _UPDATE_COLS = (
     "salary_min",
     "salary_max",
     "currency",
+    "experience_min",
+    "experience_max",
     "posted_date",
     "description",
     "skills",
@@ -97,6 +103,8 @@ def main() -> None:
                 s_min, s_max = salary_from_description(fields.get("description"))
                 if s_min is not None:
                     fields["salary_min"], fields["salary_max"] = s_min, s_max
+            exp = experience_from_description(fields.get("description"))
+            fields["experience_min"], fields["experience_max"] = exp
             if not fields.get("title") or not r.source_url:
                 skipped += 1
                 log.warning("skip raw id=%s (%s): missing title/url", r.id, r.source)
