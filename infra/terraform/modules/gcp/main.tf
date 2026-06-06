@@ -59,7 +59,7 @@ resource "google_sql_database_instance" "postgres" {
   deletion_protection = false
 
   settings {
-    edition = "ENTERPRISE"
+    edition           = "ENTERPRISE"
     tier              = var.cloudsql_tier
     availability_type = "ZONAL"
     disk_size         = 10
