@@ -1,0 +1,12 @@
+# Copy to terraform.tfvars and adjust as needed.
+# Defaults use TF-isolated names so apply/destroy never touches the live
+# JOBATLAS warehouse/database that dbt builds into.
+warehouse_name = "JOBATLAS_TF_WH"
+database_name  = "JOBATLAS_TF"
+schema_name    = "MARTS"
+
+# Credentials are NOT set here. Before `terraform apply`, export the
+# environment variables below. `terraform validate` needs none of them.
+#   export SNOWFLAKE_ORGANIZATION_NAME=<your-org>     # SELECT CURRENT_ORGANIZATION_NAME();
+#   export SNOWFLAKE_ACCOUNT_NAME=<your-account>      # SELECT CURRENT_ACCOUNT_NAME();
+#   set -a; source ../../../../.env; set +a           # pulls SNOWFLAKE_USER / _PASSWORD / _ROLE
