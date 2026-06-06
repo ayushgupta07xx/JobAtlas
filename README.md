@@ -15,8 +15,8 @@ JobAtlas aggregates these sources into one searchable, deduplicated index. Drop 
 - **India Tech Job Market** (Tableau) — salary by city & role, skill-demand heatmap, hiring velocity, top companies: https://public.tableau.com/app/profile/ayush.gupta3056/viz/JobAtlas/Dashboard1
 - **Salary by Experience** (Tableau) — average advertised salary across experience bands (INR): https://public.tableau.com/app/profile/ayush.gupta3056/viz/SalarybyExperienceINR/Dashboard1
 - **Executive KPIs** (Looker Studio) — jobs indexed, freshness, dedup rate, match latency: https://lookerstudio.google.com/s/iStvfIBy3lE
-- **Web app** — _add Vercel URL_
-- **API** — _add Hugging Face Spaces URL_
+- **Web app** — https://job-atlas-blue.vercel.app
+- **API** — https://huggingface.co/spaces/ayushgupta7777/jobatlas-api
 
 ## What it does
 
