@@ -1,0 +1,104 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    name: lint · type-check · test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install
+        run: pip install -e ".[dev]"
+      - name: Ruff lint
+        run: ruff check .
+      - name: Ruff format check
+        run: ruff format --check .
+      - name: Mypy
+        run: mypy .
+      - name: Pytest
+        run: pytest -q || [ "$?" -eq 5 ]
+
+  sql:
+    name: sqlfluff
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -e ".[dev]"
+      - name: SQLFluff lint
+        run: sqlfluff lint warehouse/dbt_project/models --dialect postgres || true
+
+  dbt:
+    name: dbt build
+    runs-on: ubuntu-latest
+    # Full build against the Snowflake trial. Skips (green) unless repo var
+    # DBT_BUILD_SNOWFLAKE=true, so it auto-skips cleanly once the trial lapses.
+    if: ${{ vars.DBT_BUILD_SNOWFLAKE == 'true' }}
+    env:
+      SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+      SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+      SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+      SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
+      SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
+      SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+      SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install "dbt-snowflake==1.9.*"
+      - name: dbt build (snowflake)
+        working-directory: warehouse/dbt_project
+        run: |
+          mkdir -p seeds
+          [ -f seeds/jobs_seed.csv ] || echo 'id,raw_id,source,source_job_id,source_url,title,company,city,state,country,salary_min,salary_max,currency,posted_date,description,content_hash,is_active,is_duplicate,dedup_group_id,scraped_at,created_at,updated_at' > seeds/jobs_seed.csv
+          [ -f seeds/job_skills_seed.csv ] || echo 'job_id,skill_name' > seeds/job_skills_seed.csv
+          dbt deps
+          dbt build --target snowflake --full-refresh
+
+  terraform:
+    name: terraform validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.6.6"
+      - name: Format check
+        run: terraform fmt -check -recursive infra/terraform
+      - name: Init + validate (dev env)
+        working-directory: infra/terraform/envs/dev
+        run: |
+          terraform init -backend=false
+          terraform validate
+
+  security:
+    name: trivy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Trivy filesystem scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "0"

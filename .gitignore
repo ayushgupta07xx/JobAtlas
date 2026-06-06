@@ -115,3 +115,10 @@ warehouse/great_expectations/gx/
 .venv-gx/
 *:Zone.Identifier
 docs/dashboards/*.csv
+
+# Terraform
+infra/terraform/**/.terraform/
+infra/terraform/**/*.tfstate
+infra/terraform/**/*.tfstate.*
+infra/terraform/**/terraform.tfvars
+infra/terraform/**/crash.log

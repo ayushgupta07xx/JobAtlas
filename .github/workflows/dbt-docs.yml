@@ -1,0 +1,81 @@
+name: dbt-docs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "warehouse/dbt_project/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  docs:
+    name: build + publish dbt docs
+    runs-on: ubuntu-latest
+    # Skips (green) until you set repo variable DBT_DOCS_ENABLED=true and enable Pages in repo settings.
+    if: ${{ vars.DBT_DOCS_ENABLED == 'true' }}
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install "dbt-postgres==1.9.*"
+      - name: Write CI dbt profile
+        run: |
+          PROFILE=$(grep -E '^profile:' warehouse/dbt_project/dbt_project.yml | head -1 | sed -E "s/^profile:[[:space:]]*//; s/[\"']//g")
+          mkdir -p ~/.dbt
+          {
+            echo "$PROFILE:"
+            echo "  target: ci"
+            echo "  outputs:"
+            echo "    ci:"
+            echo "      type: postgres"
+            echo "      host: localhost"
+            echo "      port: 5432"
+            echo "      user: ci"
+            echo "      password: ci"
+            echo "      dbname: ci"
+            echo "      schema: public"
+            echo "      threads: 4"
+          } > ~/.dbt/profiles.yml
+      - name: Generate docs
+        working-directory: warehouse/dbt_project
+        run: |
+          mkdir -p seeds
+          [ -f seeds/job_skills_seed.csv ] || echo 'job_id,skill_name' > seeds/job_skills_seed.csv
+          [ -f seeds/jobs_seed.csv ] || echo 'id' > seeds/jobs_seed.csv
+          dbt deps
+          dbt docs generate --profiles-dir "$HOME/.dbt" --target ci
+      - name: Stage site
+        run: |
+          mkdir -p site
+          cp warehouse/dbt_project/target/index.html site/ 2>/dev/null || true
+          cp warehouse/dbt_project/target/*.json site/ 2>/dev/null || true
+          cp warehouse/dbt_project/target/graph*.gpickle site/ 2>/dev/null || true
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deployment
+        uses: actions/deploy-pages@v4
