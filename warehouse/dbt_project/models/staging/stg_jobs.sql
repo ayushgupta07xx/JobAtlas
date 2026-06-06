@@ -23,6 +23,13 @@ select
     posted_date,
     description,
     {% if target.name == 'postgres' %}
+    experience_min,
+    experience_max,
+    {% else %}
+    cast(null as integer) as experience_min,
+    cast(null as integer) as experience_max,
+    {% endif %}
+    {% if target.name == 'postgres' %}
     skills,
     {% else %}
     cast(null as varchar) as skills,
