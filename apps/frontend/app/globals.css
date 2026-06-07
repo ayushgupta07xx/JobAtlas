@@ -2,18 +2,90 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ---- Light (default) ---- */
 :root {
+  color-scheme: light;
+
   --paper: #f7f4ee;
+  --paper-raised: #fffdf8;
+  --paper-overlay: #efeae0;
   --ink: #16130f;
-  --accent: #e8492b;
+  --line: rgba(22, 19, 15, 0.12);
+  --line-strong: rgba(22, 19, 15, 0.24);
+  --accent: #e8492b; /* terracotta */
+  --accent-soft: rgba(232, 73, 43, 0.12);
+  --on-accent: #fdf6f2;
+  --glow: rgba(232, 73, 43, 0.07);
+  --glow-accent: rgba(232, 73, 43, 0.35);
+
+  --dot: rgba(22, 19, 15, 0.05);
+  --nav-bg: rgba(247, 244, 238, 0.8);
+  --shadow-card: 0 1px 2px rgba(22, 19, 15, 0.06);
+  --shadow-lift: 0 16px 40px -16px rgba(22, 19, 15, 0.18);
+}
+
+/* ---- Dark (opt-in) ---- */
+:root.dark {
+  color-scheme: dark;
+
+  --paper: #0a0b0c;
+  --paper-raised: #141517;
+  --paper-overlay: #1c1d20;
+  --ink: #f4f1ea;
+  --line: rgba(255, 255, 255, 0.09);
+  --line-strong: rgba(255, 255, 255, 0.16);
+  --accent: #5fb3a1; /* eucalyptus */
+  --accent-soft: rgba(95, 179, 161, 0.16);
+  --on-accent: #122722;
+  --glow: rgba(95, 179, 161, 0.16);
+  --glow-accent: rgba(95, 179, 161, 0.32);
+
+  --dot: rgba(255, 255, 255, 0.04);
+  --nav-bg: rgba(10, 11, 12, 0.72);
+  --shadow-card: inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-lift: inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 18px 40px -20px rgba(0, 0, 0, 0.75);
 }
 
 body {
-  font-family: var(--font-body), system-ui, sans-serif;
+  font-family: var(--font-sans), system-ui, sans-serif;
+  background-color: var(--paper);
   background-image: radial-gradient(
     circle at 1px 1px,
-    rgba(22, 19, 15, 0.05) 1px,
+    var(--dot) 1px,
     transparent 0
   );
   background-size: 22px 22px;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  transition:
+    background-color 0.25s ease,
+    color 0.25s ease;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.025;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }
