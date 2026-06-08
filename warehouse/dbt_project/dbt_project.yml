@@ -30,18 +30,18 @@ seeds:
     +schema: seeds
     jobs_seed:
       +column_types:
-        id: bigint
-        raw_id: bigint
-        source_job_id: varchar
+        id: "{{ 'int64' if target.type == 'bigquery' else 'bigint' }}"
+        raw_id: "{{ 'int64' if target.type == 'bigquery' else 'bigint' }}"
+        source_job_id: "{{ 'string' if target.type == 'bigquery' else 'varchar' }}"
         salary_min: numeric
         salary_max: numeric
         posted_date: date
         is_active: boolean
         is_duplicate: boolean
-        dedup_group_id: bigint
+        dedup_group_id: "{{ 'int64' if target.type == 'bigquery' else 'bigint' }}"
         scraped_at: timestamp
         created_at: timestamp
         updated_at: timestamp
     job_skills_seed:
       +column_types:
-        job_id: bigint
+        job_id: "{{ 'int64' if target.type == 'bigquery' else 'bigint' }}"

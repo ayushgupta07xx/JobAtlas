@@ -7,8 +7,8 @@ with sk as (
 )
 select
     skill_name,
-    date_trunc('month', posted_date) as posted_month,
+    {{ dbt.date_trunc('month', 'posted_date') }} as posted_month,
     count(*) as job_count
 from sk
-group by skill_name, date_trunc('month', posted_date)
+group by skill_name, {{ dbt.date_trunc('month', 'posted_date') }}
 order by posted_month desc, job_count desc

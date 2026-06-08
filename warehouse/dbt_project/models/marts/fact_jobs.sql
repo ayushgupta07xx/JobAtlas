@@ -12,7 +12,7 @@ select
         "coalesce(state, 'Unknown')",
         "coalesce(country, 'ZZ')"
     ]) }}                                                                   as location_sk,
-    cast(to_char(posted_date, 'YYYYMMDD') as integer)                       as posted_date_key,
+    cast(extract(year from posted_date) * 10000 + extract(month from posted_date) * 100 + extract(day from posted_date) as integer)                       as posted_date_key,
     source,
     source_job_id,
     source_url,

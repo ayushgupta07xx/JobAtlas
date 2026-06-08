@@ -6,8 +6,8 @@ with active as (
 )
 select
     company,
-    date_trunc('month', posted_date) as posted_month,
+    {{ dbt.date_trunc('month', 'posted_date') }} as posted_month,
     count(*) as job_count
 from active
-group by company, date_trunc('month', posted_date)
+group by company, {{ dbt.date_trunc('month', 'posted_date') }}
 order by posted_month desc, job_count desc

@@ -1,6 +1,6 @@
 -- Posting freshness buckets by age in days from today.
 with active as (
-    select current_date - posted_date as age_days
+    select {{ dbt.datediff('posted_date', 'current_date', 'day') }} as age_days
     from {{ ref('int_jobs_active') }}
     where posted_date is not null
 ),

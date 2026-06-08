@@ -1,5 +1,5 @@
 -- Postgres reads the live source; other targets read the seed (multi-warehouse demo).
-with source as (
+with base as (
     {% if target.name == 'postgres' %}
     select * from {{ source('jobatlas', 'jobs') }}
     {% else %}
@@ -32,7 +32,7 @@ select
     {% if target.name == 'postgres' %}
     skills,
     {% else %}
-    cast(null as varchar) as skills,
+    cast(null as {{ dbt.type_string() }}) as skills,
     {% endif %}
     content_hash,
     is_active,
@@ -41,4 +41,4 @@ select
     scraped_at,
     created_at,
     updated_at
-from source
+from base
