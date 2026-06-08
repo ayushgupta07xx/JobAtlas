@@ -126,12 +126,12 @@ formatting may need a fuzzier key later; revisit when real cross-source overlap 
 ## ADR-0009 — dim_job as SCD Type 2 via dbt snapshot (check strategy)
 **Context:** Resume contract commits to SCD Type 2 on dim_job tracking title/salary/description changes.
 **Decision:** YAML-defined snapshot `dim_job_snapshot` (dbt 1.9+ form) over `int_jobs_active`, `check` strategy on [title, company, salary_min, salary_max, description], `unique_key=id`, schema `snapshots`. The `dim_job` mart reads the snapshot, exposing `job_version_sk` / stable `job_sk` / `dbt_valid_from` / `dbt_valid_to` / `is_current`; `fact_jobs` joins via `job_sk`.
-**Consequences:** Initial snapshot is the baseline (0 changes); versions accrue as `daily_scrape` re-runs mutate source rows, growing toward the ≥100-version target. Star covered by 28 tests.
+**Consequences:** Initial snapshot is the baseline (0 changes); versions accrue as `daily_scrape` re-runs mutate source rows, growing toward the ≥100-version target. Star covered by 93 tests.
 
 ## ADR-0010 — Multi-warehouse via target-gated dbt models + seeds
 **Context:** The product contract commits to dbt models materializing into both BigQuery and Snowflake. Source data lives in Postgres; the other warehouses have no live connection to it.
 **Decision:** `profiles.yml` carries postgres/snowflake/bigquery targets. Models are target-gated: Postgres reads the live `staging.jobs` source and unnests `skills` natively; non-Postgres targets read CSV seeds (`jobs_seed`, pre-unnested `job_skills_seed`) and use dialect-appropriate date functions (`dayofweek`/`dayname` vs `extract(dow)`/`to_char(...,'Day')`). `stg_jobs_embeddings` is disabled off-Postgres (pgvector-only). Fresh warehouses build with `dbt build` (DAG-ordered). Seeds are gitignored (scraped content; LEGAL no-redistribution) and regenerated via `\copy` (documented in `docs/multi-warehouse.md`).
-**Consequences:** Identical star schema + SCD2 build on Postgres and Snowflake (502/264 parity, 28 tests green on each). BigQuery target built and verified during the GCP demo window (502/264 parity matching Postgres/Snowflake; torn down per per-cycle protocol). Snowflake uses a dedicated `TRANSFORM` role + X-SMALL auto-suspend warehouse; it is a 30-day-trial demonstration, not the free-forever stack (Postgres/DuckDB).
+**Consequences:** Identical star schema + SCD2 build on Postgres and Snowflake (502/264 parity, 93 tests green on each). BigQuery target built and verified during the GCP demo window (502/264 parity matching Postgres/Snowflake; torn down per per-cycle protocol). Snowflake uses a dedicated `TRANSFORM` role + X-SMALL auto-suspend warehouse; it is a 30-day-trial demonstration, not the free-forever stack (Postgres/DuckDB).
 
 ---
 
