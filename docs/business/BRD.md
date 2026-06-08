@@ -34,7 +34,7 @@ The cost falls unevenly across segments: fresh graduates over-apply with no fit 
 
 | ID | Objective | Measure of success |
 |---|---|---|
-| O1 | Unify multiple sources into one deduplicated, searchable index | 6,000–8,000 live postings; duplicates collapsed at Jaccard ≥ 0.85 |
+| O1 | Unify multiple sources into one deduplicated, searchable index | 9,000+ live postings; duplicates collapsed at Jaccard ≥ 0.85 |
 | O2 | Deliver AI resume-to-job matching with an interpretable score | Ranked matches returned at p95 < 100 ms |
 | O3 | Provide salary and skill-demand intelligence | Salary views by role/city (where data exists) and top-skills-by-city explorer live |
 | O4 | Instrument the product and establish a North Star metric | 24 events / 3 funnels / 5 cohorts; North Star = Weekly Matched Applications, plus 8 tracked KPIs |
@@ -74,7 +74,7 @@ The **North Star metric** is *Weekly Matched Applications* — the count of appl
 
 ## 6. Success criteria
 
-- Multi-source index live with 6,000–8,000 deduplicated postings, refreshed daily.
+- Multi-source index live with 9,000+ deduplicated postings, refreshed daily.
 - Resume-match flow live end-to-end with score and explanation, meeting the latency target.
 - Salary and skill-demand views live, with coverage disclosed where source data is sparse.
 - Analytics live (24 events / 3 funnels / 5 cohorts) and a North Star plus 8 KPIs defined and tracked.

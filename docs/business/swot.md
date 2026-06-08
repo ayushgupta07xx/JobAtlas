@@ -4,7 +4,7 @@ A structured assessment of JobAtlas's internal position (strengths, weaknesses) 
 
 ## Strengths
 
-- **Cross-portal aggregation with deduplication.** Unifies six-plus sources into a single deduplicated index — the core capability no incumbent offers, reflected in JobAtlas's category-leading aggregation score in the competitive matrix.
+- **Cross-portal aggregation with deduplication.** Unifies eight live sources into a single deduplicated index — the core capability no incumbent offers, reflected in JobAtlas's category-leading aggregation score in the competitive matrix.
 - **AI semantic matching with explanation.** Embedding-based resume-to-job matching returns a score *and* the overlapping skills behind it, surfacing fits that keyword search misses — especially for non-linear careers.
 - **Zero-cost, sustainable operation.** Runs free-forever on open-source/free-tier infrastructure at ₹0/month, removing monetisation pressure and lowering operating risk.
 - **Modern, defensible data stack.** Orchestrated ingestion, warehouse modelling with SCD Type 2, vector search and CI/CD give a maintainable, observable platform rather than a brittle one-off.

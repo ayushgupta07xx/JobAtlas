@@ -8,7 +8,7 @@
 
 The Indian tech job market is split across eight-plus portals — Naukri, Wellfound, Hirist, Instahyre, Indeed, LinkedIn, Adzuna, Jobicy. Each has its own search, its own filters, its own quirks. A senior backend engineer looking for a role in Bangalore opens five tabs and pastes the same query into each. The result is dozens of overlapping postings and no good way to compare.
 
-JobAtlas aggregates these sources into one searchable, deduplicated index. Drop in a resume and the matcher ranks postings by semantic similarity to your experience, not keyword overlap alone.
+JobAtlas builds one searchable, deduplicated index from the sources that allow open programmatic access — official APIs and public ATS feeds (see Sources below). Drop in a resume and the matcher ranks postings by semantic similarity to your experience, not keyword overlap alone.
 
 ## Live
 
@@ -25,7 +25,7 @@ Type a query and JobAtlas returns deduplicated, salary-normalized, freshness-ran
 ## By the numbers
 
 - **9,000+** active, deduplicated India tech postings across 8 sources
-- **41** dbt models on a star-schema warehouse materialized to **both BigQuery and Snowflake**, with **SCD Type 2** on the job dimension
+- **40** dbt models on a star-schema warehouse materialized to **both BigQuery and Snowflake**, with **SCD Type 2** on the job dimension
 - Semantic resume → job matching with **~6 ms p95** vector retrieval (200-candidate pool, pgvector HNSW)
 - Required-experience parsed from posting text to drive salary-by-experience analysis
 - MinHash deduplication across sources (`title + company + city` signature)
