@@ -1,6 +1,6 @@
 # Multi-Warehouse Deployment
 
-JobAtlas runs the same dbt project against multiple warehouses from one codebase. Postgres is the development warehouse (and, alongside DuckDB, the free-forever production target); Snowflake is a parallel deployment demonstrated during a 30-day trial; BigQuery is wired and waits on the GCP setup window.
+JobAtlas runs the same dbt project against multiple warehouses from one codebase. Postgres is the development warehouse (and, alongside DuckDB, the free-forever production target); Snowflake is a parallel deployment demonstrated during a 30-day trial; BigQuery was built and verified during the GCP demo window (identical star schema + SCD2, 502/264 row parity, all data tests green), then torn down per the per-cycle protocol.
 
 ## One project, multiple targets
 

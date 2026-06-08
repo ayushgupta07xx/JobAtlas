@@ -121,7 +121,7 @@ formatting may need a fuzzier key later; revisit when real cross-source overlap 
 ## ADR-0008 — dbt in an isolated venv with a multi-target profile
 **Context:** dbt's transitive pins (jinja2/agate/protobuf) conflict with the app `.venv` (torch-cpu, scrapy, sentence-transformers, SQLAlchemy 2.0); the project also needs Postgres + BigQuery + Snowflake targets.
 **Decision:** Dedicated `.venv-dbt` at repo root (gitignored), mirroring the Airflow isolated-venv precedent (ADR-0006). One committed `profiles.yml` (secrets via `env_var`) with postgres/bigquery/snowflake targets — only postgres exercised locally. Marts materialize into the existing `marts` schema (migration 0001); staging/intermediate into `dbt_staging`/`dbt_intermediate` via a `generate_schema_name` override. Layered staging → intermediate → marts; dbt_utils for surrogate keys and date spine.
-**Consequences:** dbt deps isolated from app code; profiles portable. BigQuery target waits on GCP setup (deferred), Snowflake on the Day-10 trial. dbt SQL is excluded from the repo sqlfluff hook via `.sqlfluffignore`.
+**Consequences:** dbt deps isolated from app code; profiles portable. BigQuery target built and verified during the GCP demo window (then torn down), Snowflake on the Day-10 trial. dbt SQL is excluded from the repo sqlfluff hook via `.sqlfluffignore`.
 
 ## ADR-0009 — dim_job as SCD Type 2 via dbt snapshot (check strategy)
 **Context:** Resume contract commits to SCD Type 2 on dim_job tracking title/salary/description changes.
@@ -131,7 +131,7 @@ formatting may need a fuzzier key later; revisit when real cross-source overlap 
 ## ADR-0010 — Multi-warehouse via target-gated dbt models + seeds
 **Context:** The product contract commits to dbt models materializing into both BigQuery and Snowflake. Source data lives in Postgres; the other warehouses have no live connection to it.
 **Decision:** `profiles.yml` carries postgres/snowflake/bigquery targets. Models are target-gated: Postgres reads the live `staging.jobs` source and unnests `skills` natively; non-Postgres targets read CSV seeds (`jobs_seed`, pre-unnested `job_skills_seed`) and use dialect-appropriate date functions (`dayofweek`/`dayname` vs `extract(dow)`/`to_char(...,'Day')`). `stg_jobs_embeddings` is disabled off-Postgres (pgvector-only). Fresh warehouses build with `dbt build` (DAG-ordered). Seeds are gitignored (scraped content; LEGAL no-redistribution) and regenerated via `\copy` (documented in `docs/multi-warehouse.md`).
-**Consequences:** Identical star schema + SCD2 build on Postgres and Snowflake (502/264 parity, 28 tests green on each). BigQuery target ready, pending GCP setup. Snowflake uses a dedicated `TRANSFORM` role + X-SMALL auto-suspend warehouse; it is a 30-day-trial demonstration, not the free-forever stack (Postgres/DuckDB).
+**Consequences:** Identical star schema + SCD2 build on Postgres and Snowflake (502/264 parity, 28 tests green on each). BigQuery target built and verified during the GCP demo window (502/264 parity matching Postgres/Snowflake; torn down per per-cycle protocol). Snowflake uses a dedicated `TRANSFORM` role + X-SMALL auto-suspend warehouse; it is a 30-day-trial demonstration, not the free-forever stack (Postgres/DuckDB).
 
 ---
 
