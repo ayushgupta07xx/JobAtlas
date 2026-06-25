@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { animate, motion, useReducedMotion } from "framer-motion";
 
 import { JobCard } from "@/components/JobCard";
+import AdVideo from "@/components/AdVideo";
 import {
   getSources,
   searchJobs,
@@ -282,6 +283,14 @@ function HomeBody() {
           <Stat value={8} label="sources unified" />
           <Stat value={380} suffix="+" label="semantic dimensions" />
         </motion.div>
+      </section>
+
+      {/* ---- See it in action ---- */}
+      <section className="mx-auto w-full max-w-5xl px-4 pb-16 text-center">
+        <p className="mb-6 text-xs font-medium uppercase tracking-[0.2em] text-accent">
+          See it in action
+        </p>
+        <AdVideo />
       </section>
 
       {/* ---- Results label ---- */}
