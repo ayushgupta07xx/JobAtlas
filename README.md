@@ -169,9 +169,13 @@ docs/            architecture, decisions (ADRs), business docs, dashboards
 
 ## Design
 
-Low-fidelity wireframes for the three user segments — fresh graduate, career switcher, and senior hire — plus the recruiter benchmarking flow are in Figma:
+Low-fidelity wireframes for the three user segments — fresh graduate, career switcher, and senior hire — plus the recruiter benchmarking flow:
 
-**[JobAtlas — Wireframes (Figma)](https://www.figma.com/design/Dzl2dFyb8HC5kgCXShw3Oc/JobAtlas-%E2%80%94-Wireframes?node-id=4-2&t=1wUhvodBKDhRevtv-1)**
+![Wireframe screens](docs/images/wireframes/Figma_Wireframe_Screens.png)
+
+![Wireframe components](docs/images/wireframes/Figma_Wireframe_Components.png)
+
+![Wireframe user flows](docs/images/wireframes/Figma_Wireframe_Flows.png)
 
 Flows covered: unified search & results, resume-to-job matching, salary & skill intelligence, job detail, and recruiter company view.
 
