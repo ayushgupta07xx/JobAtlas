@@ -131,7 +131,7 @@ formatting may need a fuzzier key later; revisit when real cross-source overlap 
 ## ADR-0010 — Multi-warehouse via target-gated dbt models + seeds
 **Context:** The product contract commits to dbt models materializing into both BigQuery and Snowflake. Source data lives in Postgres; the other warehouses have no live connection to it.
 **Decision:** `profiles.yml` carries postgres/snowflake/bigquery targets. Models are target-gated: Postgres reads the live `staging.jobs` source and unnests `skills` natively; non-Postgres targets read CSV seeds (`jobs_seed`, pre-unnested `job_skills_seed`) and use dialect-appropriate date functions (`dayofweek`/`dayname` vs `extract(dow)`/`to_char(...,'Day')`). `stg_jobs_embeddings` is disabled off-Postgres (pgvector-only). Fresh warehouses build with `dbt build` (DAG-ordered). Seeds are gitignored (scraped content; LEGAL no-redistribution) and regenerated via `\copy` (documented in `docs/multi-warehouse.md`).
-**Consequences:** Identical star schema + SCD2 build on Postgres and Snowflake (502/264 parity, 93 tests green on each). BigQuery target built and verified during the GCP demo window (502/264 parity matching Postgres/Snowflake; torn down per per-cycle protocol). Snowflake uses a dedicated `TRANSFORM` role + X-SMALL auto-suspend warehouse; it is a 30-day-trial demonstration, not the free-forever stack (Postgres/DuckDB).
+**Consequences:** Identical star schema + SCD2 build on Postgres and Snowflake (502/264 parity, 93 tests green on each). BigQuery target built and verified during the GCP demo window (502/264 parity matching Postgres/Snowflake; torn down per per-cycle protocol). Snowflake uses a dedicated `TRANSFORM` role + X-SMALL auto-suspend warehouse; it is a 30-day-trial demonstration, not the free-forever stack (Postgres/Neon).
 
 ---
 
@@ -208,3 +208,14 @@ The HNSW `ef_search` GUC defaults to 40, silently capping `ORDER BY embedding <=
 - LLM extraction: rejected on cost, latency, and non-determinism for a field a tight regex resolves with near-zero false positives.
 
 **Consequences:** Experience populated on ~29% of jobs (3,065/10,423); the rest stay NULL and surface as a "Not specified" band in the dashboard, never a fabricated figure. Recall is deliberately traded for precision so the dimension and the salary regression never ingest a bad value. Re-evaluate if a source begins returning structured experience.
+
+## ADR-0017: BigQuery dialect compatibility for the cross-warehouse dbt project
+**Status:** Accepted
+**Context:** The same dbt project targets Postgres (dev + free-forever), Snowflake (trial demo), and BigQuery (GCP demo window) from one codebase. BigQuery's SQL dialect diverges from Postgres/Snowflake in ways that compile clean on the others but fail — or silently mis-resolve — on BQ, so a green `dbt build` on Postgres is not evidence the BQ target works.
+**Decision:** Gate the dialect differences through dbt cross-db macros and target conditionals rather than per-warehouse model forks. Specific fixes applied:
+- `date_trunc` argument order differs (BQ is `date_trunc(col, part)` vs Postgres `date_trunc(part, col)`) — route through the dbt `date_trunc` cross-db macro.
+- BQ has no `datediff` / `dayname` / `varchar` / `bigint` — use the `datediff` cross-db macro and `type_string()` / int64 typing instead of literal type names.
+- A CTE named `source` shadows the `source` column on BQ (the range-variable wins, so `source` resolves to the whole-row STRUCT, not the column) — renamed the offending CTEs.
+- Seed `column_types` declared as `int64` / `string` on the BQ target (vs `integer` / `text`).
+- `generate_schema_name` override lands BQ models in bare datasets (`marts`, `dbt_staging`, …), NOT Terraform's `jobatlas_marts` dataset (which stays empty) — teardown therefore requires `bq rm -r -f` on the bare datasets, not the Terraform-named one.
+**Consequences:** `dbt build --target bigquery` = 136 PASS / 0 ERROR / 0 SKIP (40 models, 93 data tests, 1 SCD2 snapshot, 2 seeds), with 502/264 seed-subset row parity against Postgres and Snowflake. The fixes are warehouse-portable and reused by other projects in the portfolio that target BigQuery. BQ datasets were torn down per the per-cycle GCP protocol after evidence capture (`docs/images/gcp/`).
