@@ -1,6 +1,6 @@
 # Multi-Warehouse Deployment
 
-JobAtlas runs the same dbt project against multiple warehouses from one codebase. Postgres is the development warehouse (and, alongside DuckDB, the free-forever production target); Snowflake is a parallel deployment demonstrated during a 30-day trial; BigQuery was built and verified during the GCP demo window (identical star schema + SCD2, 502/264 row parity, all data tests green), then torn down per the per-cycle protocol.
+JobAtlas runs the same dbt project against multiple warehouses from one codebase. Postgres (Neon) is both the development warehouse and the free-forever production target; Snowflake is a parallel deployment demonstrated during a 30-day trial; BigQuery was built and verified during the GCP demo window (identical star schema + SCD2, 502/264 row parity, all data tests green), then torn down per the per-cycle protocol.
 
 ## One project, multiple targets
 
@@ -49,4 +49,4 @@ docker compose exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "\
 
 ## Production note
 
-The free-forever production stack runs on Postgres (Neon) + DuckDB on Parquet — not Snowflake or BigQuery. The warehouse targets are an architectural demonstration; the dbt code lets anyone reproduce them on their own account.
+The free-forever production stack runs on Postgres (Neon) — not Snowflake or BigQuery. The warehouse targets are an architectural demonstration; the dbt code lets anyone reproduce them on their own account.
