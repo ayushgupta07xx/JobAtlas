@@ -50,6 +50,23 @@ JobAtlas builds one searchable, deduplicated index from the sources that allow o
 | 📊 **Dashboards** | Public BI — market view + executive KPIs | **[Tableau](https://public.tableau.com/app/profile/ayush.gupta3056/viz/JobAtlas/Dashboard1)** · **[Looker Studio](https://lookerstudio.google.com/s/iStvfIBy3lE)** |
 | 🛠️ **Deploy your own** | One stack, free-tier — `terraform apply` | **[infra/terraform](infra/terraform)** |
 
+## Dashboards & analytics
+
+Market intelligence and product instrumentation built on the same warehouse that powers search.
+
+**Salary & skill-demand intelligence** — salary by city and role, skill-demand heatmap, hiring velocity (Tableau Public).
+
+![JobAtlas market dashboard](docs/images/analytics/tableau_market_dashboard.png)
+
+**Executive KPIs** — jobs indexed, freshness, dedup rate, and match latency at a glance (Looker Studio).
+
+![Executive KPIs dashboard](docs/images/analytics/looker_executive_kpis.png)
+
+**Product analytics instrumentation** — event taxonomy, funnels, and cohorts wired through PostHog to measure how the product is used.
+
+![PostHog funnel and cohort instrumentation](docs/images/analytics/posthog_funnel.png)
+
+
 ## What it does
 
 Type a query and JobAtlas returns deduplicated, salary-normalized, freshness-ranked postings from every connected source at once. Upload a resume and `sentence-transformers` embeds it, pgvector finds the nearest postings, and each result carries a match score reflecting how closely your skills and experience overlap the role.
